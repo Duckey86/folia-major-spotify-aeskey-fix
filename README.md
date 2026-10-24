@@ -42,6 +42,14 @@ Lyrics Reimagined // 辞曲新境
 3. 如果首次启动出现 **Connect Spotify Soloist**，输入**你自己的 Soloist API Key**；应用会使用 Windows 加密保存它。
 4. 在 Folia 中登录 Spotify，然后播放歌曲。安装版会尝试自动启动 Soloist。如有需要，在 Spotify Connect 中选择 **Folia Audio**。
 
+### Spotify Soloist 设置指南
+
+在使用本分支的 Spotify 播放功能之前，请先阅读并按照 [Spotify Soloist 官方文档](https://developer.spotify.com/documentation/soloist) 下载 Soloist、获取个人 API Key，并完成初始配置。
+
+配置完成后，启动 **Folia Soloist**，并在提示时输入你的 API Key，即可使用 Spotify 播放功能。
+
+**注意：** 请妥善保管你的 API Key，不要将其公开分享。Spotify Soloist 需要通过 Spotify 官方渠道获取，本仓库不提供其可执行文件。
+
 **安装包说明：** 这些步骤只适用于在构建时**启用了 Soloist 集成并包含用户自行下载的 `soloist.exe`** 的个人安装包。本仓库目前不保证有可公开下载的安装包；请勿将原版 Folia 的安装包与本分支混淆。请勿公开上传个人 API Key；未经相应授权，也不要重新分发包含 Soloist 可执行文件的安装包。
 
 **限制：** 这是对 `node-librespot` `AesKey` 故障的替代播放方案，并未修复其根本原因。Soloist 单独输出音频，因此 Folia 可视化、均衡器和 Automix 不能直接处理这些音频。
