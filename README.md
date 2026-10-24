@@ -31,6 +31,40 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
+## Spotify AesKey Workaround (Windows)
+
+This fork adds experimental Spotify playback through **Spotify Soloist**, bypassing the `node-librespot` backend's `AesKey` failure.
+
+### Setup
+
+1. Clone this repository and run `npm ci`.
+2. Download Spotify Soloist from the [official documentation](https://developer.spotify.com/documentation/soloist/reference/downloads-and-updates).
+3. Obtain your personal Soloist API key.
+4. Open PowerShell in the folder containing `soloist.exe` and run:
+
+```powershell
+$env:SOLOIST_API_KEY = Read-Host "Soloist API key"
+.\soloist.exe --device-name "Folia Audio" --api-key $env:SOLOIST_API_KEY --ws 127.0.0.1:9090
+```
+
+5. Open a second PowerShell window in the cloned Folia project and run:
+
+```powershell
+$env:VITE_FOLIA_SOLOIST = "1"
+npm run dev:electron
+```
+
+Spotify playback should now be routed through Soloist. Keep the Soloist process running while using this development setup.
+
+### Limitations
+
+- Experimental Windows integration.
+- Folia's visualizer, equalizer and audio effects cannot process Soloist's actual audio.
+- Soloist must be downloaded separately.
+- This is a workaround, not a fix for the underlying `AesKey` issue.
+
+Based on the original [Folia project](https://github.com/chthollyphile/folia-major), licensed under AGPL-3.0.
+
 ## 项目简介
 
 Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，支持网易云、酷狗、QQ 音乐、Navidrome 和本地音乐库，桌面端还支持波点音乐、YouTube Music、Spotify 和汽水音乐，通过智能歌词匹配，AI生成配色主题，以及多种全屏歌词动画为用户提供独特的听歌体验。
