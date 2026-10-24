@@ -145,6 +145,40 @@ describe('Spotify audio', () => {
         expect(sessions[1].close).not.toHaveBeenCalled();
     });
 
+    it('tries 160 kbps once when Spotify refuses a 320 kbps audio key, retaining the chosen bitrate', async () => {
+        const { audio, file, get, openSession } = setup();
+        const original = openSession.getMockImplementation()!;
+        openSession.mockImplementation(async () => {
+            const session = await original();
+            const resolve = session.resolveAudioFileAsync;
+            session.resolveAudioFileAsync = vi.fn(async ({ bitrate }: { bitrate: number }) => {
+                if (bitrate === 320) throw new Error('audio key unavailable: Error { kind: Unavailable, error: AesKey }');
+                return { ...await resolve(), format: 'OGG_VORBIS_160' };
+            });
+            return session;
+        });
+        const issued = await audio.issue(TRACK, 320);
+        expect(issued.format).toBe('OGG_VORBIS_160');
+        const whole = await get(issued.url);
+        expect(whole.status).toBe(200);
+        expect((await readAll(whole)).equals(file.subarray(LEAD))).toBe(true);
+    });
+
+    it('reports a specific failure when Spotify refuses both qualities', async () => {
+        const { audio, openSession } = setup();
+        const original = openSession.getMockImplementation()!;
+        openSession.mockImplementation(async () => {
+            const session = await original();
+            session.resolveAudioFileAsync = vi.fn(async () => {
+                throw new Error('audio key unavailable: Error { kind: Unavailable, error: AesKey }');
+            });
+            return session;
+        });
+        await expect(audio.issue(TRACK, 320)).rejects.toMatchObject({
+            code: 'unavailable', message: 'Spotify refused the audio key at both available qualities',
+        });
+    });
+
     it('refuses a file the key does not open, and a kind of file it cannot give the element', async () => {
         const broken = plainFile();
         broken.write('nope', LEAD, 'latin1');

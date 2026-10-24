@@ -1,6 +1,6 @@
 {
   "name": "folia-major",
-  "productName": "Folia",
+  "productName": "Folia Soloist",
   "desktopName": "folia-major.desktop",
   "description": "Lyrics Reimagine",
   "author": {
@@ -63,8 +63,8 @@
     "manual:ai-probe": "node test/manual/ai_probe.mjs"
   },
   "build": {
-    "appId": "top.izuna.foliamajor",
-    "productName": "Folia",
+    "appId": "local.folia.soloist.personal",
+    "productName": "Folia Soloist",
     "beforePack": "build/beforePack.cjs",
     "afterPack": "build/afterPack.cjs",
     "electronLanguages": [
@@ -76,13 +76,7 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "chthollyphile",
-        "repo": "folia-major"
-      }
-    ],
+    "publish": [],
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -180,7 +174,7 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
-      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "artifactName": "Folia-Soloist-Setup-${version}.${ext}",
       "target": [
         "nsis"
       ],
@@ -191,6 +185,13 @@
           "to": ".",
           "filter": [
             "folia-wallpaper-helper.exe"
+          ]
+        },
+        {
+          "from": "build/soloist-local",
+          "to": "soloist",
+          "filter": [
+            "soloist.exe"
           ]
         }
       ]

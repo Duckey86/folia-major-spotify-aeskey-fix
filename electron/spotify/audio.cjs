@@ -164,6 +164,12 @@ function createSpotifyAudio({
           // A new connection that cannot load the track's entry: Spotify has no such track.
           if (aboutTheTrack || /failed to load audio item/i.test(said)) throw spotifyError('not-playable', 'Spotify has no audio for this track', said);
           disconnect(connection);
+          // A failed key on an already held connection gets one fresh connection
+          // through the normal retry path. Only after a fresh connection fails do
+          // we classify it as an audio-key refusal, allowing the 160 kbps fallback.
+          if (/audio key unavailable|audio key error|\bAesKey\b/i.test(said)) {
+            throw spotifyError('unavailable', 'Spotify refused the audio key', said);
+          }
           throw spotifyError(toErrorResult(error).error.code === 'network' ? 'network' : 'unavailable', 'Spotify did not give the track', said);
         }
         warn(`[Spotify] ${trackId} could not be located on the kept connection; a new one is made (${plainWords(said)})`);
@@ -330,14 +336,32 @@ function createSpotifyAudio({
     // every call so that reloading a failed source is a real change for the audio element.
     async issue(trackId, bitrate) {
       if (typeof trackId !== 'string' || !TRACK_ID.test(trackId)) throw spotifyError('unsupported', 'Invalid Spotify track id');
-      // A sign-in or sign-out while the file was being located drops it; the track is then
-      // located once more, for the session that is there now.
-      const file = await prepare(trackId, bitrate).catch(error => {
+      // A sign-in or sign-out while the file was being located drops it; retry for
+      // the current account. If Spotify refuses the 320 kbps key, 160 kbps is a
+      // separate file/key worth trying once; it may also be refused for this account.
+      const forBitrate = quality => prepare(trackId, quality).catch(error => {
         if (error !== sessionChanged) throw error;
-        return prepare(trackId, bitrate);
+        return prepare(trackId, quality);
       });
+      let resolvedBitrate = bitrate;
+      let file;
+      try {
+        file = await forBitrate(resolvedBitrate);
+      } catch (error) {
+        if (Number(bitrate) !== 320 || error?.message !== 'Spotify refused the audio key') throw error;
+        warn('[Spotify] 320 kbps audio key refused; attempting 160 kbps');
+        resolvedBitrate = 160;
+        try {
+          file = await forBitrate(resolvedBitrate);
+        } catch (lowerError) {
+          if (lowerError?.message !== 'Spotify refused the audio key') throw lowerError;
+          throw spotifyError('unavailable', 'Spotify refused the audio key at both available qualities', lowerError.detail);
+        }
+      }
       const key = randomKey();
-      keys.set(key, { trackId, bitrate, total: file.total, mimeType: file.mimeType, keptAs: file.keptAs, length: file.length });
+      // The issued URL must point to the bitrate that actually resolved, or the scheme
+      // handler would resolve the failed 320 kbps stream all over again.
+      keys.set(key, { trackId, bitrate: resolvedBitrate, total: file.total, mimeType: file.mimeType, keptAs: file.keptAs, length: file.length });
       while (keys.size > MAX_ISSUED_KEYS) keys.delete(keys.keys().next().value);
       return { url: `${SPOTIFY_AUDIO_SCHEME}://audio/${trackId}?k=${key}`, format: file.format };
     },
