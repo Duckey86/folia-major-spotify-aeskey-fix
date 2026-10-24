@@ -31,39 +31,22 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
-## Spotify AesKey Workaround (Windows)
+## Folia Soloist — Windows 安装版（无需 npm）
 
-This fork adds experimental Spotify playback through **Spotify Soloist**, bypassing the `node-librespot` backend's `AesKey` failure.
+> **本仓库是 Folia 的实验性 Spotify Soloist 分支。** 下方原版 Folia 的 Release 和下载链接 **不包含** 此分支的 Soloist 集成。
 
-### Setup
+如果你已经有**自行构建的** `Folia-Soloist-Setup-0.7.22.exe` 安装包，可以直接使用，无需 Node.js、npm 或 PowerShell：
 
-1. Clone this repository and run `npm ci`.
-2. Download Spotify Soloist from the [official documentation](https://developer.spotify.com/documentation/soloist/reference/downloads-and-updates).
-3. Obtain your personal Soloist API key.
-4. Open PowerShell in the folder containing `soloist.exe` and run:
+1. 双击 `Folia-Soloist-Setup-0.7.22.exe`，按照安装向导操作。
+2. 从 Windows 开始菜单打开 **Folia Soloist**。
+3. 如果首次启动出现 **Connect Spotify Soloist**，输入**你自己的 Soloist API Key**；应用会使用 Windows 加密保存它。
+4. 在 Folia 中登录 Spotify，然后播放歌曲。安装版会尝试自动启动 Soloist。如有需要，在 Spotify Connect 中选择 **Folia Audio**。
 
-```powershell
-$env:SOLOIST_API_KEY = Read-Host "Soloist API key"
-.\soloist.exe --device-name "Folia Audio" --api-key $env:SOLOIST_API_KEY --ws 127.0.0.1:9090
-```
+**安装包说明：** 这些步骤只适用于在构建时**启用了 Soloist 集成并包含用户自行下载的 `soloist.exe`** 的个人安装包。本仓库目前不保证有可公开下载的安装包；请勿将原版 Folia 的安装包与本分支混淆。请勿公开上传个人 API Key；未经相应授权，也不要重新分发包含 Soloist 可执行文件的安装包。
 
-5. Open a second PowerShell window in the cloned Folia project and run:
+**限制：** 这是对 `node-librespot` `AesKey` 故障的替代播放方案，并未修复其根本原因。Soloist 单独输出音频，因此 Folia 可视化、均衡器和 Automix 不能直接处理这些音频。
 
-```powershell
-$env:VITE_FOLIA_SOLOIST = "1"
-npm run dev:electron
-```
-
-Spotify playback should now be routed through Soloist. Keep the Soloist process running while using this development setup.
-
-### Limitations
-
-- Experimental Windows integration.
-- Folia's visualizer, equalizer and audio effects cannot process Soloist's actual audio.
-- Soloist must be downloaded separately.
-- This is a workaround, not a fix for the underlying `AesKey` issue.
-
-Based on the original [Folia project](https://github.com/chthollyphile/folia-major), licensed under AGPL-3.0.
+[English installation instructions](README.en.md)
 
 ## 项目简介
 
