@@ -29,6 +29,21 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
+## Folia Soloist — Windows installer (no npm required)
+
+> **This fork has experimental Spotify Soloist playback.** The upstream Folia releases and download links elsewhere in this README **do not include** this integration.
+
+If you already have a **personally built** `Folia-Soloist-Setup-0.7.22.exe` installer, you can use Folia Soloist without Node.js, npm, or PowerShell:
+
+1. **Double-click `Folia-Soloist-Setup-0.7.22.exe`** and complete the Windows installation wizard.
+2. Launch **Folia Soloist** from the Windows Start menu.
+3. On first launch, enter **your own Soloist API key** if the **Connect Spotify Soloist** prompt appears. The app stores it using Windows encryption.
+4. Sign in to Spotify inside Folia and play a track. The installed app attempts to launch Soloist automatically. If prompted, select **Folia Audio** in Spotify Connect.
+
+**Installer availability:** These steps only apply to a personal installer **built with the Soloist integration enabled and a user-obtained `soloist.exe` included**. There is **no guaranteed public installer download** from this repository. Do not use an upstream Folia installer expecting it to contain the Soloist workaround. Keep your API key private and do not redistribute the Soloist executable or a bundled installer without appropriate permission.
+
+**Limitations:** This bypasses the `node-librespot` `AesKey` playback failure; it does not fix the root cause. Because Soloist outputs audio separately, Folia's visualizers, equalizer, and Automix cannot process its audio directly.
+
 ## About
 
 Folia is an online music player built around full-screen, immersive lyrics. It supports NetEase Cloud Music, Kugou, QQ Music, Navidrome, and local music libraries; the desktop app also supports Bodian Music, YouTube Music, Spotify, and Qishui Music. Smart lyric matching, AI-generated color themes, and a range of full-screen lyric animations make listening feel different.
