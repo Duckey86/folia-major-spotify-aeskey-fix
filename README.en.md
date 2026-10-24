@@ -40,6 +40,14 @@ If you already have a **personally built** `Folia-Soloist-Setup-0.7.22.exe` inst
 3. On first launch, enter **your own Soloist API key** if the **Connect Spotify Soloist** prompt appears. The app stores it using Windows encryption.
 4. Sign in to Spotify inside Folia and play a track. The installed app attempts to launch Soloist automatically. If prompted, select **Folia Audio** in Spotify Connect.
 
+### Spotify Soloist Setup
+
+Before using Spotify playback in this fork, please follow the [official Spotify Soloist documentation](https://developer.spotify.com/documentation/soloist) to download Soloist, generate your personal API key, and complete the initial setup.
+
+Once configured, launch **Folia Soloist** and enter your API key when prompted.
+
+**Note:** Keep your API key private. Spotify Soloist must be obtained directly from Spotify and is not distributed with this repository.
+
 **Installer availability:** These steps only apply to a personal installer **built with the Soloist integration enabled and a user-obtained `soloist.exe` included**. There is **no guaranteed public installer download** from this repository. Do not use an upstream Folia installer expecting it to contain the Soloist workaround. Keep your API key private and do not redistribute the Soloist executable or a bundled installer without appropriate permission.
 
 **Limitations:** This bypasses the `node-librespot` `AesKey` playback failure; it does not fix the root cause. Because Soloist outputs audio separately, Folia's visualizers, equalizer, and Automix cannot process its audio directly.
