@@ -18,6 +18,7 @@ import { spotifyMutations } from './spotifyMutations';
 import { resetSpotifyRecommendations, spotifyRecommendations } from './spotifyRecommendations';
 import { describeSpotifyLoginFailure, spotifyLoginFailure } from './spotifyLoginFailure';
 import { describeSpotifyFailure } from './spotifyFailure';
+import { useSpotifySoloist, soloistSource } from './spotifySoloist';
 
 // src/services/onlineMusic/spotify/spotifyProvider.ts
 // Spotify adapter. Sign-in happens in the browser where the person is already signed in to
@@ -141,6 +142,8 @@ export const spotifyProvider: OnlineMusicProvider = {
         // its own): a free account is answered `subscription-required`. The URL is the desktop app's own.
         async getAudioSource(song, quality) {
             const id = requireSpotifySong(song);
+            // Soloist produces audio itself. Only use the local WS bridge when explicitly opted in.
+            if (useSpotifySoloist) return soloistSource(song, id, quality);
             const startedAt = Date.now();
             const audio = await requestSpotify<SpotifyWireAudio>('audio', { id, quality });
             console.log(`[Spotify] Audio for "${song.name}" (${id}) is ready as ${audio.format} after ${Date.now() - startedAt}ms`);

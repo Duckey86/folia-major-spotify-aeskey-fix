@@ -70,6 +70,7 @@ const { createYtmApiBridge } = require('./ytm/ytmApiBridge.cjs');
 const { createYtmSandbox } = require('./ytm/sandbox.cjs');
 const { YTM_AUDIO_PRIVILEGED_SCHEME, YTM_AUDIO_SCHEME } = require('./ytm/audio.cjs');
 const { createSpotifyApiBridge } = require('./spotify/spotifyApiBridge.cjs');
+const { createSoloistManager } = require('./soloist/manager.cjs');
 const { SPOTIFY_AUDIO_PRIVILEGED_SCHEME, SPOTIFY_AUDIO_SCHEME } = require('./spotify/audio.cjs');
 const { createQqAuthSessionRepository } = require('./qq/qqAuthSessionRepository.cjs');
 const { DEFAULT_DISCORD_APPLICATION_ID, createDiscordPresenceController } = require('./discordPresence.cjs');
@@ -257,6 +258,8 @@ if (process.platform === 'darwin' && process.arch === 'x64') {
 }
 
 const store = new Store({ projectName: 'Folia' });
+// Personal Windows build: a companion started only for this Folia process.
+const soloistManager = createSoloistManager({ app, BrowserWindow, ipcMain, safeStorage });
 // Before ready: the GPU process reads its switches when it starts.
 const gpuPreferenceApplied = applyGpuPreference({ app, store });
 const readActiveGpu = createActiveGpuReader(app);
@@ -2495,7 +2498,7 @@ const FOLIA_GITHUB_REPOSITORY = {
   owner: 'chthollyphile',
   repo: 'folia-major',
 };
-const WINDOWS_APP_USER_MODEL_ID = 'top.izuna.foliamajor';
+const WINDOWS_APP_USER_MODEL_ID = 'local.folia.soloist.personal';
 const REMOTE_CONTROL_WINDOW_TITLE = 'Folia Remote';
 const WINDOW_PLAYBACK_HANDOFF_REQUEST_TIMEOUT_MS = 800;
 const bundledAppIconPath = path.join(__dirname, '../build/icon.png');
@@ -3776,8 +3779,8 @@ async function fetchWithOptionalSystemProxy(url, options, useSystemProxy) {
 }
 
 function getUpdateCheckEnabled() {
-  const configured = store.get(ENABLE_UPDATE_CHECK_SETTING_KEY);
-  return configured === undefined ? true : Boolean(configured);
+  // Separate personal Soloist fork: upstream releases must never replace its modified executable.
+  return false;
 }
 
 function getAutoUpdateEnabled() {
@@ -3811,7 +3814,7 @@ function normalizeUpdateChannelSelection(value) {
 }
 
 function getUpdateCheckSupportReason() {
-  return getCurrentReleaseChannel().updateEnabled ? null : 'channel';
+  return 'personal-soloist-fork';
 }
 
 function isUpdateCheckSupported() {
@@ -5826,6 +5829,10 @@ app.whenReady().then(async () => {
     return;
   }
 
+  if (app.isPackaged || process.env.FOLIA_SOLOIST_AUTOSTART === '1') {
+    void soloistManager.start().catch(error => console.warn('[Soloist] Startup failed:', error.message));
+  }
+
   if (process.platform === 'win32') {
     app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
   }
@@ -6140,6 +6147,7 @@ app.on('before-quit', (event) => {
     return;
   }
   isQuitHeldForAccounts = false;
+  soloistManager.stop();
   transcodeService.dispose();
   videoExportFileWriter.disposeSync();
   isAppQuitting = true;

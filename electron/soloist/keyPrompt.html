@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self';" />
+<title>Connect Spotify Soloist</title>
+<style>
+  body { font: 14px system-ui, sans-serif; background: #16181c; color: #f1f3f5; margin: 25px; }
+  h2 { margin: 0 0 9px; font-size: 20px; }
+  p { color: #acb2ba; line-height: 1.5; }
+  label { display: block; margin: 18px 0 8px; }
+  input { box-sizing: border-box; background: #22262d; color: white; border: 1px solid #686c74; border-radius: 8px; padding: 11px; width: 100%; }
+  button { background: #1db954; border: 0; border-radius: 8px; padding: 11px 21px; font-weight: 700; cursor: pointer; margin-top: 15px; }
+  #error { color: #ff9c9c; min-height: 20px; }
+</style>
+</head>
+<body>
+<h2>Connect Spotify Soloist</h2>
+<p>Enter the API key you generated on Spotify for Developers. It stays on this PC, protected using Windows encryption.</p>
+<form id="form">
+<label for="key">Soloist API key</label>
+<input id="key" type="password" autocomplete="off" autofocus required />
+<button type="submit">Save and start Soloist</button>
+</form>
+<p id="error" role="alert"></p>
+<script src="keyPrompt.js"></script>
+</body>
+</html>
