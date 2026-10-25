@@ -177,6 +177,12 @@ contextBridge.exposeInMainWorld('electron', {
     bodianRequest: (operation, params) => ipcRenderer.invoke('bodian-api-request', operation, params),
     ytmRequest: (operation, params) => ipcRenderer.invoke('ytm-api-request', operation, params),
     spotifyRequest: (operation, params) => ipcRenderer.invoke('spotify-api-request', operation, params),
+    // Process-filtered Soloist audio analysis: spectral feature frames, NOT PCM data.
+    onSoloistAudioFrame: (callback) => {
+        const listener = (_event, frame) => callback(frame);
+        ipcRenderer.on('soloist-audio-frame', listener);
+        return () => ipcRenderer.removeListener('soloist-audio-frame', listener);
+    },
     getQqPort: () => ipcRenderer.invoke('get-qq-port'),
     getQqApiStatus: () => ipcRenderer.invoke('get-qq-api-status'),
     onQqApiStatusChanged: (callback) => {
