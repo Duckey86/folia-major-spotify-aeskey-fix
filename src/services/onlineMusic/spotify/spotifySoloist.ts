@@ -35,7 +35,8 @@ let currentSourceUrl: string | null = null;
 let remoteUri: string | null = null;
 let expectingPlayUntil = 0;
 let listenersInstalled = false;
-const suppressedSeekUntil = new WeakMap<HTMLAudioElement, number>();
+// Internal silent-timeline corrections must never be echoed to Soloist as user seeks.
+const suppressedSeekUntil = new WeakMap<HTMLAudioElement, { target: number; startedAt: number }>();
 const suppressedRemotePauseUntil = new WeakMap<HTMLAudioElement, number>();
 const soloistVolume = () => {
     const { volume, isMuted } = useAudioSettingsStore.getState();
@@ -73,6 +74,11 @@ function infoOf(audio: HTMLAudioElement): RegisteredTrack | undefined {
     return tracks.get(audio.currentSrc) ?? tracks.get(audio.src);
 }
 
+// Identify the silent timeline so it never overwrites captured audio bands.
+export function isSoloistTimelineAudio(audio: HTMLAudioElement | null): boolean {
+    return audio !== null && Boolean(infoOf(audio));
+}
+
 function syncPosition(position: SoloistEvent['position']) {
     if (!position || !currentAudio || !currentUri) return;
     const audio = currentAudio;
@@ -82,8 +88,9 @@ function syncPosition(position: SoloistEvent['position']) {
     const elapsedMs = typeof position.timestamp_ms === 'number' && position.speed === 1
         ? Math.max(0, Date.now() - position.timestamp_ms) : 0;
     const next = Math.max(0, Math.min((baseMs + elapsedMs) / 1000, Math.max(0, audio.duration - 0.1)));
-    if (Number.isFinite(next) && Math.abs(audio.currentTime - next) > 1.3) {
-        suppressedSeekUntil.set(audio, performance.now() + 400);
+    // Correct persistent offset, including differences smaller than the previous 1.3s dead zone.
+    if (Number.isFinite(next) && Math.abs(audio.currentTime - next) > 0.35) {
+        suppressedSeekUntil.set(audio, { target: next, startedAt: performance.now() });
         audio.currentTime = next;
     }
 }
@@ -162,6 +169,21 @@ function ready(): Promise<WebSocket> {
     return connecting;
 }
 
+// Re-anchor Folia's silent timeline when returning from a background window.
+// Soloist position_sync is an anchor update, NOT a periodic clock tick; get_state
+// supplies a fresh position even when no new position_sync has been broadcast.
+let lastPositionRequestMs = 0;
+function requestPositionSnapshot(): void {
+    if (!currentUri || !currentAudio || !remoteLoggedIn || conn?.readyState !== WebSocket.OPEN) return;
+    if (Date.now() - lastPositionRequestMs < 600) return;
+    lastPositionRequestMs = Date.now();
+    try {
+        conn.send(JSON.stringify({ type: 'command', command: 'get_state' }));
+    } catch (error) {
+        console.warn('[Soloist] Could not refresh playback position', error);
+    }
+}
+
 let commandChain: Promise<void> = Promise.resolve();
 function command(name: string, fields: Record<string, unknown> = {}): void {
     // Commands are ordered to avoid a stale pause overtaking the next track's play.
@@ -195,7 +217,10 @@ function installControls() {
         expectingPlayUntil = Date.now() + 1300;
         command('play', changed ? { uri: info.uri } : {});
         command('set_volume', { volume: soloistVolume() });
-        // Ask for authoritative position after the play dispatch.
+        // Re-check after Soloist has processed play and the track guard has expired.
+        window.setTimeout(() => {
+            if (currentAudio === audio && currentUri === info.uri && !audio.paused) requestPositionSnapshot();
+        }, 1700);
         console.info(`[Soloist] ${changed ? 'Starting' : 'Resuming'} ${info.uri}`);
     }, true);
 
@@ -209,7 +234,14 @@ function installControls() {
     document.addEventListener('seeking', event => {
         const audio = event.target;
         if (!(audio instanceof HTMLAudioElement) || audio !== currentAudio) return;
-        if (performance.now() < (suppressedSeekUntil.get(audio) ?? 0)) return;
+        const correction = suppressedSeekUntil.get(audio);
+        if (correction) {
+            suppressedSeekUntil.delete(audio);
+            const ageSeconds = (performance.now() - correction.startedAt) / 1000;
+            // The seeking event can be delayed by background throttling. Compare with the
+            // corrected position extrapolated forward, not a short fixed 400ms timeout.
+            if (ageSeconds < 15 && Math.abs(audio.currentTime - (correction.target + ageSeconds)) < 1.0) return;
+        }
         if (Number.isFinite(audio.currentTime)) command('seek', { position_ms: Math.round(audio.currentTime * 1000) });
     }, true);
 
@@ -224,6 +256,18 @@ function installControls() {
     document.addEventListener('ended', event => {
         if (event.target === currentAudio) command('pause');
     }, true);
+
+    // Keep the clock anchored while visible, and always re-check immediately on Alt+Tab back.
+    // This is lightweight metadata polling; it does not stream audio over WebSocket.
+    window.setInterval(() => {
+        if (document.visibilityState === 'visible' && currentAudio && !currentAudio.paused) {
+            requestPositionSnapshot();
+        }
+    }, 2500);
+    window.addEventListener('focus', requestPositionSnapshot);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') requestPositionSnapshot();
+    });
 
     window.addEventListener('beforeunload', () => {
         if (currentAudio && conn?.readyState === WebSocket.OPEN && remoteLoggedIn) {

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
+const { createSoloistCaptureBridge } = require('./capture.cjs');
 
 // electron/soloist/manager.cjs
 // Opt-in Windows companion manager for a PERSONAL Folia+Soloist build.
@@ -44,6 +45,7 @@ function createSoloistManager({
   let stopped = false;
   let starting = null;
   let sessionKey = null;
+  const captureBridge = createSoloistCaptureBridge({ app, BrowserWindow, processEnv, logger });
   const keyPath = () => path.join(app.getPath('userData'), KEY_FILE);
 
   const encryptionAvailable = () => safeStorage.isEncryptionAvailable();
@@ -139,6 +141,7 @@ function createSoloistManager({
         // Key can still be imported to encrypted storage for a future run.
         if (processEnv.SOLOIST_API_KEY) readKey();
         logger.info('[Soloist] Local port 9090 is already in use; assuming an external Soloist session');
+        captureBridge.start(0);
         return 'external';
       }
       const key = readKey();
@@ -149,9 +152,10 @@ function createSoloistManager({
           '--ws', `${HOST}:${PORT}`,
         ], { windowsHide: true, stdio: 'ignore', detached: false });
         child = launched;
+        launched.once('spawn', () => captureBridge.start(launched.pid));
         launched.once('error', error => logger.warn('[Soloist] Failed to start local executable:', error.code || error.name));
         launched.once('exit', (code, signal) => {
-          if (child === launched) child = null;
+          if (child === launched) { child = null; captureBridge.stop(); }
           if (!stopped) logger.warn(`[Soloist] Process exited (code=${code}, signal=${signal || 'none'}). A newer Soloist build may be needed.`);
         });
         logger.info('[Soloist] Started personal Spotify Soloist process; connect via Spotify app if prompted');
@@ -166,6 +170,7 @@ function createSoloistManager({
 
   function stop() {
     stopped = true;
+    captureBridge.stop();
     if (prompt && !prompt.isDestroyed()) prompt.close();
     if (child && child.exitCode === null && !child.killed) {
       child.kill();

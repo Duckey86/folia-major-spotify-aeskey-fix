@@ -17,6 +17,8 @@ import {
 import { getTransitionHandoffProgress } from '../../../../services/automix/transitionCue';
 import { omni } from '../../../../services/onlineMusic/omni';
 import { tickBeatFx } from '../../../../services/beatFx/beatFxLive';
+import { isSoloistTimelineAudio } from '../../../../services/onlineMusic/spotify/spotifySoloist';
+import { latestSoloistCaptureFrame } from '../../../../services/onlineMusic/spotify/soloistCaptureFeed';
 import { useBeatFxTrack } from '../../../../hooks/useBeatFxTrack';
 import { readIncomingLyricClock } from './incomingLyricClock';
 import { isBackgroundLyricHeld, setHeldLyricTime, useBackgroundLyricHoldStore } from '../../backgroundThrottling/backgroundLyricHoldStore';
@@ -242,10 +244,21 @@ export function usePlaybackVisualizerBridge({
         // is downstream of both, so it has real signal: dropping to the idle breath here would put
         // a visible stutter at exactly the moment meant to be seamless.
         const hasAudibleSignal = isActuallyPlaying || isTransitionAudible();
+        const isSoloistTimeline = isSoloistTimelineAudio(audioElement);
+        const soloistFrame = isSoloistTimeline ? latestSoloistCaptureFrame() : null;
 
         if (backgroundHold) {
             // The bands keep their last values: nothing draws from them while held.
-        } else if (hasAudibleSignal && analyserRef.current) {
+        } else if (soloistFrame) {
+            // Capture only analysis data from Soloist; no audio playback in Folia.
+            audioPower.set(soloistFrame.power);
+            audioBands.bass.set(soloistFrame.bass);
+            audioBands.lowMid.set(soloistFrame.lowMid);
+            audioBands.mid.set(soloistFrame.mid);
+            audioBands.vocal.set(soloistFrame.vocal);
+            audioBands.treble.set(soloistFrame.treble);
+            audioBands.spectrum?.set(Uint8Array.from(soloistFrame.spectrum));
+        } else if (!isSoloistTimeline && hasAudibleSignal && analyserRef.current) {
             const bufferLength = analyserRef.current.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             analyserRef.current.getByteFrequencyData(dataArray);
