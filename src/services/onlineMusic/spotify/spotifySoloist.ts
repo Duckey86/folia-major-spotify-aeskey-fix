@@ -11,6 +11,7 @@ const SOLOIST_URL = 'ws://127.0.0.1:9090';
 const SAMPLE_RATE = 8000;
 const MAX_SILENCE_MS = 30 * 60 * 1000;
 const MAX_TRACKS = 24;
+const REPEAT_OFF_RETRY_MS = 2500;
 
 export const useSpotifySoloist = import.meta.env.VITE_FOLIA_SOLOIST === '1'
     && typeof window !== 'undefined'
@@ -23,10 +24,12 @@ type SoloistEvent = {
     message?: string;
     status?: string;
     item?: { uri?: string };
+    options?: { repeat?: 'off' | 'context' | 'track' };
     position?: { position_ms?: number; timestamp_ms?: number; speed?: number };
 };
 const tracks = new Map<string, RegisteredTrack>();
 let conn: WebSocket | null = null;
+let latestSocket: WebSocket | null = null;
 let connecting: Promise<WebSocket> | null = null;
 let remoteLoggedIn = false;
 let currentAudio: HTMLAudioElement | null = null;
@@ -35,6 +38,13 @@ let currentSourceUrl: string | null = null;
 let remoteUri: string | null = null;
 let expectingPlayUntil = 0;
 let listenersInstalled = false;
+let playbackGeneration = 0;
+let wantsPlayback = false;
+let playStartedAt = 0;
+let remoteRepeat: 'off' | 'context' | 'track' | null = null;
+let repeatOffPendingAt: number | null = null;
+// Loaded only when playback starts: the store's cover resolver itself uses the provider registry.
+let playbackStore: typeof import('../../../stores/usePlaybackStore').usePlaybackStore;
 // Internal silent-timeline corrections must never be echoed to Soloist as user seeks.
 const suppressedSeekUntil = new WeakMap<HTMLAudioElement, { target: number; startedAt: number }>();
 const suppressedRemotePauseUntil = new WeakMap<HTMLAudioElement, number>();
@@ -71,8 +81,17 @@ export function createSilentWav(durationMs: number): Blob {
 }
 
 function infoOf(audio: HTMLAudioElement): RegisteredTrack | undefined {
-    return tracks.get(audio.currentSrc) ?? tracks.get(audio.src);
+    // currentSrc can still name the outgoing resource after React has assigned the next src.
+    if (audio.currentSrc && audio.currentSrc !== audio.src) return undefined;
+    return tracks.get(audio.currentSrc || audio.src);
 }
+
+const isSelectedAudio = (audio: HTMLAudioElement) => (
+    audio.currentSrc === audio.src && audio.currentSrc === playbackStore.getState().audioSrc
+);
+const ownsTimeline = (audio: HTMLAudioElement) => (
+    audio === currentAudio && audio.currentSrc === currentSourceUrl && isSelectedAudio(audio)
+);
 
 // Identify the silent timeline so it never overwrites captured audio bands.
 export function isSoloistTimelineAudio(audio: HTMLAudioElement | null): boolean {
@@ -82,7 +101,8 @@ export function isSoloistTimelineAudio(audio: HTMLAudioElement | null): boolean 
 function syncPosition(position: SoloistEvent['position']) {
     if (!position || !currentAudio || !currentUri) return;
     const audio = currentAudio;
-    if (infoOf(audio)?.uri !== currentUri || audio.seeking) return;
+    if (!ownsTimeline(audio) || infoOf(audio)?.uri !== currentUri || audio.seeking || audio.ended) return;
+    if (typeof position.timestamp_ms === 'number' && position.timestamp_ms < playStartedAt) return;
     const baseMs = position.position_ms;
     if (typeof baseMs !== 'number' || !Number.isFinite(baseMs)) return;
     const elapsedMs = typeof position.timestamp_ms === 'number' && position.speed === 1
@@ -95,8 +115,53 @@ function syncPosition(position: SoloistEvent['position']) {
     }
 }
 
+// Folia owns the queue in every loop mode. Soloist's context is just one track, so context
+// repeat must never stand for Folia's repeat-all; repeat-one already restarts the silent timeline.
+// Send this pair on the connected socket before play, independently of track-command generations.
+function ensureRemoteRepeatOff(socket: WebSocket): void {
+    if (socket !== latestSocket) return;
+    if (remoteRepeat === 'off') return;
+    const now = performance.now();
+    if (repeatOffPendingAt !== null && now - repeatOffPendingAt < REPEAT_OFF_RETRY_MS) return;
+    repeatOffPendingAt = now;
+    try {
+        socket.send(JSON.stringify({ type: 'command', command: 'set_repeat_track', enabled: false }));
+        socket.send(JSON.stringify({ type: 'command', command: 'set_repeat_context', enabled: false }));
+    } catch (error) {
+        repeatOffPendingAt = null;
+        throw error;
+    }
+}
+
 function onEvent(event: SoloistEvent) {
-    if (event.type === 'auth_state') remoteLoggedIn = event.logged_in === true;
+    // Options describe the daemon, not the age of this track's position anchor. Process them
+    // even when the snapshot below is too old to drive the current timeline.
+    if (event.type === 'playback_state' || event.type === 'options_changed') {
+        const repeat = event.options?.repeat;
+        if (repeat === 'off' || repeat === 'context' || repeat === 'track') {
+            remoteRepeat = repeat;
+            // Dispatch acceptance is not state confirmation. Coalesce intermediate/duplicate
+            // non-off snapshots until the options actually confirm off. If they never do, the
+            // existing status poll can retry after a cooldown; there is no separate retry loop.
+            if (repeat === 'off') repeatOffPendingAt = null;
+            if (currentAudio && ownsTimeline(currentAudio) && remoteLoggedIn && conn?.readyState === WebSocket.OPEN) {
+                try { ensureRemoteRepeatOff(conn); }
+                catch (error) { console.warn('[Soloist] Could not disable remote repeat', error); }
+            }
+        }
+    }
+    // A late snapshot for an earlier play of the same URI must not pause or rewind its new play.
+    if (typeof event.position?.timestamp_ms === 'number' && event.position.timestamp_ms < playStartedAt) return;
+    if (event.type === 'auth_state') {
+        remoteLoggedIn = event.logged_in === true;
+        if (!remoteLoggedIn) {
+            remoteRepeat = null;
+            repeatOffPendingAt = null;
+        } else if (currentAudio && ownsTimeline(currentAudio) && conn?.readyState === WebSocket.OPEN) {
+            try { ensureRemoteRepeatOff(conn); }
+            catch (error) { console.warn('[Soloist] Could not restore remote repeat mode', error); }
+        }
+    }
     if (event.type === 'track_changed' || event.type === 'playback_state') {
         remoteUri = event.item?.uri ?? null;
     }
@@ -108,12 +173,13 @@ function onEvent(event: SoloistEvent) {
     // When a Spotify app pauses the same Soloist track, reflect it in Folia too.
     if ((event.type === 'playback_changed' || event.type === 'playback_state')
         && remoteUri === currentUri
-        && currentAudio && infoOf(currentAudio)?.uri === currentUri
+        && currentAudio && ownsTimeline(currentAudio) && !currentAudio.ended && infoOf(currentAudio)?.uri === currentUri
         && Date.now() >= expectingPlayUntil) {
         if (event.status === 'paused' && !currentAudio.paused) {
             const audio = currentAudio;
             // Do not echo this remote pause back as a second pause command.
             suppressedRemotePauseUntil.set(audio, performance.now() + 1000);
+            wantsPlayback = false;
             audio.pause();
         }
     }
@@ -125,6 +191,10 @@ function ready(): Promise<WebSocket> {
     if (connecting) return connecting;
     connecting = new Promise<WebSocket>((resolve, reject) => {
         const socket = new WebSocket(SOLOIST_URL);
+        latestSocket = socket;
+        remoteUri = null;
+        remoteRepeat = null;
+        repeatOffPendingAt = null;
         let settled = false;
         const limit = setTimeout(() => {
             if (settled) return;
@@ -139,6 +209,7 @@ function ready(): Promise<WebSocket> {
             reject(new Error(message));
         };
         socket.addEventListener('message', raw => {
+            if (socket !== latestSocket) return;
             let data: SoloistEvent;
             try {
                 data = JSON.parse(String(raw.data)) as SoloistEvent;
@@ -149,20 +220,32 @@ function ready(): Promise<WebSocket> {
                     fail('Soloist is running, but Spotify Connect is not logged in');
                     socket.close();
                 } else {
+                    conn = socket;
+                    try { ensureRemoteRepeatOff(socket); }
+                    catch (error) {
+                        console.warn('[Soloist] Could not initialize remote repeat', error);
+                        fail('Soloist repeat mode could not be initialized');
+                        socket.close();
+                        return;
+                    }
                     settled = true;
                     clearTimeout(limit);
-                    conn = socket;
                     console.info('[Soloist] Connected to Spotify Soloist on localhost');
                     resolve(socket);
                 }
             } else if (data.type === 'error') {
+                // A rejected control must not leave repeat synchronization permanently pending.
+                repeatOffPendingAt = null;
+                remoteRepeat = null;
                 console.warn('[Soloist] Command rejected:', data.message);
             }
         });
         socket.addEventListener('error', () => fail('Cannot connect to Soloist at ws://127.0.0.1:9090'));
         socket.addEventListener('close', () => {
+            if (socket !== latestSocket) return;
             if (conn === socket) conn = null;
             remoteLoggedIn = false;
+            remoteUri = null;
             if (!settled) fail('Soloist disconnected during login');
         });
     }).finally(() => { connecting = null; });
@@ -175,6 +258,7 @@ function ready(): Promise<WebSocket> {
 let lastPositionRequestMs = 0;
 function requestPositionSnapshot(): void {
     if (!currentUri || !currentAudio || !remoteLoggedIn || conn?.readyState !== WebSocket.OPEN) return;
+    if (!ownsTimeline(currentAudio) || currentAudio.ended) return;
     if (Date.now() - lastPositionRequestMs < 600) return;
     lastPositionRequestMs = Date.now();
     try {
@@ -187,10 +271,20 @@ function requestPositionSnapshot(): void {
 let commandChain: Promise<void> = Promise.resolve();
 function command(name: string, fields: Record<string, unknown> = {}): void {
     // Commands are ordered to avoid a stale pause overtaking the next track's play.
+    // Ordering alone is insufficient: a selection or pause can supersede work awaiting ready().
+    const generation = playbackGeneration;
     commandChain = commandChain.catch(() => undefined).then(async () => {
+        if (generation !== playbackGeneration) return;
         const socket = await ready();
+        if (generation !== playbackGeneration) return;
+        if (name === 'play') ensureRemoteRepeatOff(socket);
         socket.send(JSON.stringify({ type: 'command', command: name, ...fields }));
-    }).catch(error => console.error(`[Soloist] ${name} failed`, error));
+    }).catch(error => {
+        if (generation !== playbackGeneration) return;
+        console.error(`[Soloist] ${name} failed`, error);
+        // A failed play must remain retryable by the normal play control.
+        if (name === 'play' && currentAudio && ownsTimeline(currentAudio)) currentAudio.pause();
+    });
 }
 
 /** Capture non-bubbling media events, and forward Folia's existing transport to Soloist. */
@@ -201,6 +295,7 @@ function installControls() {
     document.addEventListener('playing', event => {
         const audio = event.target;
         if (!(audio instanceof HTMLAudioElement)) return;
+        if (!isSelectedAudio(audio) || audio.paused || audio.ended) return;
         const info = infoOf(audio);
         if (!info) {
             if (currentAudio) command('pause');
@@ -209,31 +304,41 @@ function installControls() {
             currentSourceUrl = null;
             return;
         }
-        const sourceUrl = audio.currentSrc || audio.src;
-        const changed = info.uri !== currentUri || currentAudio !== audio || currentSourceUrl !== sourceUrl || remoteUri !== info.uri;
+        const sourceUrl = audio.currentSrc;
+        const changed = info.uri !== currentUri || currentAudio !== audio || currentSourceUrl !== sourceUrl;
+        // Seeking and rebuffering can emit playing again before Soloist confirms the first play.
+        if (!changed && wantsPlayback) return;
+        playbackGeneration += 1;
+        const generation = playbackGeneration;
+        wantsPlayback = true;
+        suppressedSeekUntil.delete(audio);
+        suppressedRemotePauseUntil.delete(audio);
         currentAudio = audio;
         currentUri = info.uri;
         currentSourceUrl = sourceUrl;
         expectingPlayUntil = Date.now() + 1300;
-        command('play', changed ? { uri: info.uri } : {});
+        playStartedAt = Date.now();
+        command('play', changed || remoteUri !== info.uri ? { uri: info.uri } : {});
         command('set_volume', { volume: soloistVolume() });
         // Re-check after Soloist has processed play and the track guard has expired.
         window.setTimeout(() => {
-            if (currentAudio === audio && currentUri === info.uri && !audio.paused) requestPositionSnapshot();
+            if (generation === playbackGeneration && ownsTimeline(audio) && !audio.paused) requestPositionSnapshot();
         }, 1700);
         console.info(`[Soloist] ${changed ? 'Starting' : 'Resuming'} ${info.uri}`);
     }, true);
 
     document.addEventListener('pause', event => {
         const audio = event.target;
-        if (!(audio instanceof HTMLAudioElement) || audio !== currentAudio) return;
+        if (!(audio instanceof HTMLAudioElement) || !ownsTimeline(audio) || !audio.paused) return;
+        wantsPlayback = false;
+        playbackGeneration += 1;
         if (performance.now() < (suppressedRemotePauseUntil.get(audio) ?? 0)) return;
         command('pause');
     }, true);
 
     document.addEventListener('seeking', event => {
         const audio = event.target;
-        if (!(audio instanceof HTMLAudioElement) || audio !== currentAudio) return;
+        if (!(audio instanceof HTMLAudioElement) || !ownsTimeline(audio)) return;
         const correction = suppressedSeekUntil.get(audio);
         if (correction) {
             suppressedSeekUntil.delete(audio);
@@ -242,8 +347,31 @@ function installControls() {
             // corrected position extrapolated forward, not a short fixed 400ms timeout.
             if (ageSeconds < 15 && Math.abs(audio.currentTime - (correction.target + ageSeconds)) < 1.0) return;
         }
-        if (Number.isFinite(audio.currentTime)) command('seek', { position_ms: Math.round(audio.currentTime * 1000) });
+        if (Number.isFinite(audio.currentTime)) {
+            expectingPlayUntil = Date.now() + 1300;
+            playStartedAt = Date.now();
+            // Native repeat-one wraps without ended. Explicitly restart this URI, since the
+            // remote single-track context may already have stopped or advanced at its real end.
+            if (audio.loop && !audio.paused && audio.currentTime < 0.5 && currentUri) {
+                playbackGeneration += 1;
+                command('play', { uri: currentUri });
+            } else {
+                command('seek', { position_ms: Math.round(audio.currentTime * 1000) });
+            }
+        }
     }, true);
+
+    // Folia's selected source, not whichever deck emits last, owns the remote player.
+    // A source change also invalidates outgoing callbacks while the next track is loading.
+    playbackStore.subscribe((next, previous) => {
+        if (next.audioSrc === previous.audioSrc || !currentAudio || next.audioSrc === currentSourceUrl) return;
+        playbackGeneration += 1;
+        wantsPlayback = false;
+        currentAudio = null;
+        currentUri = null;
+        currentSourceUrl = null;
+        command('pause');
+    });
 
     // Folia applies volume in its Web Audio graph, so element.volume may stay 1.
     // Read the actual listener volume from Folia's audio settings instead.
@@ -254,7 +382,13 @@ function installControls() {
     });
 
     document.addEventListener('ended', event => {
-        if (event.target === currentAudio) command('pause');
+        const audio = event.target;
+        if (!(audio instanceof HTMLAudioElement) || !ownsTimeline(audio) || !audio.ended) return;
+        wantsPlayback = false;
+        playbackGeneration += 1;
+        // Even a one-song repeat-all queue can reuse this URL: its next playing is a fresh start.
+        currentSourceUrl = null;
+        command('pause');
     }, true);
 
     // Keep the clock anchored while visible, and always re-check immediately on Alt+Tab back.
@@ -279,6 +413,7 @@ function installControls() {
 /** Returns playable timeline media, while the actual audible sound is delegated to Soloist. */
 export async function soloistSource(song: SongResult, trackId: string, quality: AudioQualityPreference): Promise<{ url: string; fetchedAt: number; quality: AudioQualityPreference }> {
     if (!/^[0-9A-Za-z]{22}$/.test(trackId)) throw new Error('Invalid Spotify track ID');
+    playbackStore ??= (await import('../../../stores/usePlaybackStore')).usePlaybackStore;
     await ready();
     installControls();
     const durationMs = createProviderSongMetadata(song).durationMs || 180000;

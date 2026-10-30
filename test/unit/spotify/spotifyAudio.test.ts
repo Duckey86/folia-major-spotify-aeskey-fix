@@ -4,6 +4,9 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { onlineFailureOf, stopsPlayback } from '@/services/onlineMusic/failure/onlineFailureCase';
+import { describeSpotifyFailure } from '@/services/onlineMusic/spotify/spotifyFailure';
+import { OnlineProviderError } from '@/types/onlineMusic';
 
 // test/unit/spotify/spotifyAudio.test.ts — the scheme handler that serves Spotify's audio,
 // against a stand-in for Spotify's CDN that holds a file encrypted the way Spotify encrypts one.
@@ -11,8 +14,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
 const { createSpotifyAudio, counterAt } = require('../../../electron/spotify/audio.cjs');
 const { createSpotifyAudioFiles } = require('../../../electron/spotify/audioFiles.cjs');
+const { toErrorResult } = require('../../../electron/spotify/errors.cjs');
 
 const TRACK = '4cOdK2wGLETKBW3PvgPWqT';
+const EARLIER_TRACK = '1111111111111111111111';
+const REFUSED_KEY = 'audio key unavailable: Error { kind: Unavailable, error: AesKey }';
 const KEY = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
 const LEAD = 0xa7;
 // A file as Spotify keeps one: its own page, then the Ogg stream, encrypted from the fixed counter.
@@ -25,6 +31,15 @@ const plainFile = (length = 6000) => {
 const encrypt = (file: Buffer) => crypto.createCipheriv('aes-128-ctr', KEY, Buffer.from('72e067fbddcbcf77ebe8bc643f630d93', 'hex')).update(file);
 const readAll = async (response: Response) => Buffer.from(await response.arrayBuffer());
 
+// What the renderer makes of a failure: the shared case, and whether the queue stops.
+const shown = async (asking: Promise<unknown>) => {
+    const thrown = await asking.then(() => null, error => error);
+    const { error } = toErrorResult(thrown);
+    const provided = new OnlineProviderError(error.code, error.message, 'spotify');
+    const failure = onlineFailureOf({ operation: 'audio', providerId: 'spotify' }, { error: provided, detail: describeSpotifyFailure('audio', provided) ?? undefined });
+    return { case: failure.case, stops: stopsPlayback(failure, true), message: error.message };
+};
+
 // The folders the tests keep files in.
 const folders: string[] = [];
 const folder = () => {
@@ -35,8 +50,8 @@ const folder = () => {
 afterEach(() => { folders.splice(0).forEach(made => fs.rmSync(made, { recursive: true, force: true })); });
 
 // The CDN: answers a range of the encrypted file, and refuses the addresses listed in `expired`.
-// With `directory`, files are kept there.
-const setup = ({ file = plainFile(), format = 'OGG_VORBIS_320', directory }: { file?: Buffer; format?: string; directory?: string } = {}) => {
+// With `directory`, files are kept there. Each new connection fails with `fail` until told otherwise.
+const setup = ({ file = plainFile(), format = 'OGG_VORBIS_320', directory, fail = null }: { file?: Buffer; format?: string; directory?: string; fail?: string | null } = {}) => {
     const sealed = encrypt(file);
     const expired = new Set<string>();
     const asked: string[] = [];
@@ -51,7 +66,7 @@ const setup = ({ file = plainFile(), format = 'OGG_VORBIS_320', directory }: { f
     const sessions: any[] = [];
     const openSession = vi.fn(async () => {
         const session = {
-            fail: null as null | string,
+            fail: fail as null | string,
             resolveAudioFileAsync: vi.fn(async () => {
                 if (session.fail) throw new Error(session.fail);
                 located += 1;
@@ -146,37 +161,109 @@ describe('Spotify audio', () => {
     });
 
     it('tries 160 kbps once when Spotify refuses a 320 kbps audio key, retaining the chosen bitrate', async () => {
-        const { audio, file, get, openSession } = setup();
-        const original = openSession.getMockImplementation()!;
-        openSession.mockImplementation(async () => {
-            const session = await original();
-            const resolve = session.resolveAudioFileAsync;
-            session.resolveAudioFileAsync = vi.fn(async ({ bitrate }: { bitrate: number } = { bitrate: 320 }) => {
-                if (bitrate === 320) throw new Error('audio key unavailable: Error { kind: Unavailable, error: AesKey }');
-                return { ...await resolve(), format: 'OGG_VORBIS_160' };
-            });
-            return session;
+        const directory = folder();
+        const { audio, file, get, openSession, sessions, advance } = setup({ directory });
+        // Establish that this account receives keys before exercising a bitrate-specific refusal.
+        await audio.issue(EARLIER_TRACK, 320);
+        const resolve = sessions[0].resolveAudioFileAsync;
+        const requested: number[] = [];
+        sessions[0].resolveAudioFileAsync = vi.fn(async ({ bitrate }: { bitrate: number }) => {
+            requested.push(bitrate);
+            if (bitrate === 320) throw new Error(REFUSED_KEY);
+            return { ...await resolve(), format: 'OGG_VORBIS_160' };
         });
         const issued = await audio.issue(TRACK, 320);
         expect(issued.format).toBe('OGG_VORBIS_160');
         const whole = await get(issued.url);
         expect(whole.status).toBe(200);
         expect((await readAll(whole)).equals(file.subarray(LEAD))).toBe(true);
+        expect(requested).toEqual([320, 160]);
+        expect(await audio.keep(issued.url, 0)).toBe(true);
+        expect(fs.readdirSync(directory)).toEqual([`${TRACK}-160.bin`]);
+        // Refreshing an issued URL must keep its resolved bitrate, never re-enter the 320 fallback.
+        advance(11 * 60 * 1000);
+        const part = await get(issued.url, 'bytes=5-20');
+        expect(part.status).toBe(206);
+        expect((await readAll(part)).equals(file.subarray(LEAD + 5, LEAD + 21))).toBe(true);
+        expect(requested).toEqual([320, 160, 160]);
+        expect(openSession).toHaveBeenCalledTimes(1);
+        expect(sessions[0].close).not.toHaveBeenCalled();
     });
 
-    it('reports a specific failure when Spotify refuses both qualities', async () => {
-        const { audio, openSession } = setup();
+    it('reports retry-later with both bitrate diagnostics when Spotify refuses both qualities after giving a key', async () => {
+        const { audio, openSession, sessions, fetch } = setup();
+        await audio.issue(EARLIER_TRACK, 320);
+        sessions[0].resolveAudioFileAsync.mockClear();
+        fetch.mockClear();
+        sessions[0].fail = REFUSED_KEY;
+        const failed = audio.issue(TRACK, 320);
+        await expect(failed).rejects.toMatchObject({
+            code: 'unavailable', message: 'Spotify refused the audio key for now',
+            detail: `320 kbps: ${REFUSED_KEY}; 160 kbps: ${REFUSED_KEY}`,
+        });
+        expect(await shown(failed)).toEqual({ case: 'retry-later', stops: false, message: 'Spotify refused the audio key for now' });
+        expect(sessions[0].resolveAudioFileAsync.mock.calls).toEqual([
+            [{ uri: `spotify:track:${TRACK}`, bitrate: 320 }],
+            [{ uri: `spotify:track:${TRACK}`, bitrate: 160 }],
+        ]);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(openSession).toHaveBeenCalledTimes(1);
+        expect(sessions[0].close).not.toHaveBeenCalled();
+    });
+
+    it.each([160, 320])('does not try another bitrate for an account-wide refusal at %i kbps', async bitrate => {
+        const { audio, sessions, openSession, fetch } = setup({ fail: REFUSED_KEY });
+        const failed = audio.issue(TRACK, bitrate);
+        await expect(failed).rejects.toMatchObject({ code: 'unavailable', message: 'Spotify gives this account no audio key', detail: REFUSED_KEY });
+        expect(await shown(failed)).toEqual({ case: 'account-refused', stops: true, message: 'Spotify gives this account no audio key' });
+        expect(sessions[0].resolveAudioFileAsync.mock.calls).toEqual([[{ uri: `spotify:track:${TRACK}`, bitrate }]]);
+        expect(openSession).toHaveBeenCalledTimes(1);
+        expect(sessions[0].close).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not retry a temporary refusal when already requesting 160 kbps', async () => {
+        const { audio, sessions, openSession } = setup();
+        await audio.issue(EARLIER_TRACK, 320);
+        sessions[0].resolveAudioFileAsync.mockClear();
+        sessions[0].fail = REFUSED_KEY;
+        expect(await shown(audio.issue(TRACK, 160))).toEqual({ case: 'retry-later', stops: false, message: 'Spotify refused the audio key for now' });
+        expect(sessions[0].resolveAudioFileAsync.mock.calls).toEqual([[{ uri: `spotify:track:${TRACK}`, bitrate: 160 }]]);
+        expect(openSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares each bitrate request across simultaneous attempts and stops after both refusals', async () => {
+        const { audio, sessions, openSession } = setup();
+        await audio.issue(EARLIER_TRACK, 320);
+        sessions[0].resolveAudioFileAsync.mockClear();
+        sessions[0].fail = REFUSED_KEY;
+        const outcomes = await Promise.all([shown(audio.issue(TRACK, 320)), shown(audio.issue(TRACK, 320))]);
+        expect(outcomes).toEqual(Array(2).fill({ case: 'retry-later', stops: false, message: 'Spotify refused the audio key for now' }));
+        expect(sessions[0].resolveAudioFileAsync.mock.calls).toEqual([
+            [{ uri: `spotify:track:${TRACK}`, bitrate: 320 }],
+            [{ uri: `spotify:track:${TRACK}`, bitrate: 160 }],
+        ]);
+        expect(openSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds connection recovery and does not mistake a closed key channel for a bitrate refusal', async () => {
+        const { audio, sessions, openSession } = setup({ fail: 'audio key unavailable: channel closed' });
+        // Open a working connection first; every subsequent connection retains the configured failure.
         const original = openSession.getMockImplementation()!;
-        openSession.mockImplementation(async () => {
+        openSession.mockImplementationOnce(async () => {
             const session = await original();
-            session.resolveAudioFileAsync = vi.fn(async () => {
-                throw new Error('audio key unavailable: Error { kind: Unavailable, error: AesKey }');
-            });
+            session.fail = null;
             return session;
         });
-        await expect(audio.issue(TRACK, 320)).rejects.toMatchObject({
-            code: 'unavailable', message: 'Spotify refused the audio key at both available qualities',
-        });
+        await audio.issue(EARLIER_TRACK, 320);
+        sessions[0].resolveAudioFileAsync.mockClear();
+        sessions[0].fail = 'audio key unavailable: channel closed';
+        await expect(audio.issue(TRACK, 320)).rejects.toMatchObject({ code: 'unavailable', message: 'Spotify did not give the track' });
+        expect(openSession).toHaveBeenCalledTimes(2);
+        for (const session of sessions) {
+            expect(session.resolveAudioFileAsync.mock.calls).toEqual([[{ uri: `spotify:track:${TRACK}`, bitrate: 320 }]]);
+            expect(session.close).toHaveBeenCalledTimes(1);
+        }
     });
 
     it('refuses a file the key does not open, and a kind of file it cannot give the element', async () => {
@@ -230,6 +317,32 @@ describe('Spotify audio', () => {
         await Promise.all([audio.issue(TRACK, 160), audio.issue('1111111111111111111111', 320)]);
         expect(sessions[0].close).toHaveBeenCalledTimes(1);
         expect(openSession).toHaveBeenCalledTimes(2);
+    });
+
+    it('tells a refused key apart: an account never given one stops, one given keys before tries later; a CDN 429 tries later', async () => {
+        const { audio, sessions, openSession, logs, fetch } = setup({ fail: REFUSED_KEY });
+        // No key yet in this run: the account cannot play; no new connection is made for it.
+        expect(await shown(audio.issue(TRACK, 320))).toEqual({ case: 'account-refused', stops: true, message: 'Spotify gives this account no audio key' });
+        expect(openSession).toHaveBeenCalledTimes(1);
+        expect(logs.at(-1)).toMatch(/has given this account no key in this run; the account cannot play here/);
+
+        // A key was given before: Spotify asks to slow down.
+        sessions[0].fail = null;
+        await audio.issue(TRACK, 160);
+        sessions[0].fail = REFUSED_KEY;
+        expect(await shown(audio.issue('1111111111111111111111', 320))).toEqual({ case: 'retry-later', stops: false, message: 'Spotify refused the audio key for now' });
+        expect(openSession).toHaveBeenCalledTimes(1);
+        expect(sessions[0].close).not.toHaveBeenCalled();
+        expect(logs.at(-1)).toMatch(/refused the key after giving keys in this run; asked to try later/);
+
+        // Another account signs in: what the one before was given does not count for it.
+        audio.clear();
+        expect((await shown(audio.issue(TRACK, 320))).case).toBe('account-refused');
+
+        // The CDN answers 429.
+        sessions[1].fail = null;
+        fetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
+        expect(await shown(audio.issue('2222222222222222222222', 320))).toMatchObject({ case: 'retry-later', stops: false });
     });
 
     it('answers a line that fails as a network error, so that the element asks again', async () => {

@@ -9,7 +9,7 @@
 
 Lyrics Reimagined // 辞曲新境
 
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) | English
 
 [![GitHub release](https://img.shields.io/github/v/release/chthollyphile/folia-major?label=release)](https://github.com/chthollyphile/folia-major/releases)
 [![License](https://img.shields.io/github/license/chthollyphile/folia-major)](https://github.com/chthollyphile/folia-major/blob/main/LICENSE)
@@ -29,28 +29,44 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
-## Folia Soloist — Windows installer (no npm required)
+## Folia Major v0.7.23 + Spotify Soloist
 
-> **This fork has experimental Spotify Soloist playback.** The upstream Folia releases and download links elsewhere in this README **do not include** this integration.
+This branch integrates Spotify Soloist with upstream Folia Major v0.7.23. Its installer version is `0.7.23-soloist.1`. The production Windows installer has been built and manually verified: Spotify playback, next-track transitions, repeat synchronization, lyrics, the native capture helper, beat-reactive visualization, and app restart all work.
 
-If you already have a **personally built** `Folia-Soloist-Setup-0.7.22.exe` installer, you can use Folia Soloist without Node.js, npm, or PowerShell:
+The upstream Folia releases and download links elsewhere in this README do not include this integration. With a personally built `Folia-Soloist-Setup-0.7.23-soloist.1.exe` installer, you can use Folia Soloist without Node.js, npm, or PowerShell:
 
-1. **Double-click `Folia-Soloist-Setup-0.7.22.exe`** and complete the Windows installation wizard.
+1. Double-click `Folia-Soloist-Setup-0.7.23-soloist.1.exe` and complete the Windows installation wizard.
 2. Launch **Folia Soloist** from the Windows Start menu.
-3. On first launch, enter **your own Soloist API key** if the **Connect Spotify Soloist** prompt appears. The app stores it using Windows encryption.
-4. Sign in to Spotify inside Folia and play a track. The installed app attempts to launch Soloist automatically. If prompted, select **Folia Audio** in Spotify Connect.
+3. The Spotify account window shows the **Soloist setup guide** on first launch. Choose **Generate Soloist API key**, generate a personal key on Spotify's official site using your Premium account, and paste it into Folia.
+4. Download and extract the official Soloist build, select `soloist.exe`, and choose **Save and start Soloist**. Folia stores the key using operating-system encryption.
+5. In the Spotify app on the same local network, select **Folia Audio**. Folia then shows the connected state. Sign in to Spotify in the same Folia account window for library and lyric access. Reopen **Spotify Soloist setup** from the account window or command palette to change the key, reconnect, or view the guide.
 
 ### Spotify Soloist Setup
 
-Before using Spotify playback in this fork, please follow the [official Spotify Soloist documentation](https://developer.spotify.com/documentation/soloist) to download Soloist, generate your personal API key, and complete the initial setup.
+The Spotify account window guides you through key generation, the official download, executable selection, encrypted storage, and device pairing. It recognizes an existing key and executable so you can reuse your setup.
 
-Once configured, launch **Folia Soloist** and enter your API key when prompted.
+If a key is rejected, a Soloist build expires, or startup or pairing fails, the window offers recovery actions and a link to the [official Spotify Soloist documentation](https://developer.spotify.com/documentation/soloist).
 
 **Note:** Keep your API key private. Spotify Soloist must be obtained directly from Spotify and is not distributed with this repository.
 
-**Installer availability:** These steps only apply to a personal installer **built with the Soloist integration enabled and a user-obtained `soloist.exe` included**. There is **no guaranteed public installer download** from this repository. Do not use an upstream Folia installer expecting it to contain the Soloist workaround. Keep your API key private and do not redistribute the Soloist executable or a bundled installer without appropriate permission.
+**Installer contents:** The verified installer was built with `VITE_FOLIA_SOLOIST=1` enabled in the renderer and includes Folia's native capture helper at `resources/soloist-capture/folia-soloist-capture.exe`. It does not include Spotify's `soloist.exe`; each user downloads that from Spotify and selects it in Folia. Existing personal installations can still be detected. This installer has not been publicly released.
 
-**Limitations:** This bypasses the `node-librespot` `AesKey` playback failure; it does not fix the root cause. Because Soloist outputs audio separately, Folia's visualizers, equalizer, and Automix cannot process its audio directly.
+### Beat-reactive visualization
+
+Soloist outputs the sound while Folia's native Windows capture helper supplies level and spectrum analysis to the visualizer, allowing it to react to the music's beat. The capture path does not save or forward raw audio samples. Folia manages the playback queue and repeat synchronization and keeps its lyric timeline aligned with Soloist.
+
+Soloist audio bypasses Folia's Web Audio playback graph, so the equalizer and Automix do not process its audible output. This integration provides an alternative playback path for the `node-librespot` `AesKey` failure; it does not repair that failure itself.
+
+### Build the Windows installer from source
+
+After installing dependencies and the native build tools, run in PowerShell:
+
+```powershell
+$env:VITE_FOLIA_SOLOIST = '1'
+npm run build:electron -- --win --publish never
+```
+
+The build script compiles the native capture helper and produces `release/Folia-Soloist-Setup-0.7.23-soloist.1.exe`. Keep API keys, login credentials, personally downloaded `soloist.exe`, build caches, and installers out of Git.
 
 ## About
 

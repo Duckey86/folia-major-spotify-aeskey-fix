@@ -17,11 +17,10 @@ import {
 import { getTransitionHandoffProgress } from '../../../../services/automix/transitionCue';
 import { omni } from '../../../../services/onlineMusic/omni';
 import { tickBeatFx } from '../../../../services/beatFx/beatFxLive';
-import { isSoloistTimelineAudio } from '../../../../services/onlineMusic/spotify/spotifySoloist';
-import { latestSoloistCaptureFrame } from '../../../../services/onlineMusic/spotify/soloistCaptureFeed';
 import { useBeatFxTrack } from '../../../../hooks/useBeatFxTrack';
 import { readIncomingLyricClock } from './incomingLyricClock';
 import { isBackgroundLyricHeld, setHeldLyricTime, useBackgroundLyricHoldStore } from '../../backgroundThrottling/backgroundLyricHoldStore';
+import { getHifiPosition } from '../../../../services/hifi/hifiPlayback';
 
 // src/components/app/playback/bridges/usePlaybackVisualizerBridge.ts
 
@@ -98,6 +97,8 @@ export function usePlaybackVisualizerBridge({
     const activePlaybackContext = usePlaybackStore(state => state.activePlaybackContext);
     const playerState = usePlaybackStore(state => state.playerState);
     const duration = usePlaybackStore(state => state.duration);
+    // mpv sounds the song on the HiFi route: the decks are silent, and the clock is extrapolated from mpv's position.
+    const isHifiActive = usePlaybackStore(state => state.playbackRoute) === 'hifi';
     // The lyrics on screen, matching the deck getDisplayElement points at.
     const lyrics = usePlaybackStore(selectDisplayLyrics);
     // The live lyrics, which during a blend are the incoming track's (null until they load).
@@ -239,26 +240,26 @@ export function usePlaybackVisualizerBridge({
         // Normally the active deck; the outgoing one for as long as a blend holds the picture on
         // the track it is finishing, so that clock and picture never describe different songs.
         const audioElement = getDisplayElement?.() ?? audioRef.current;
-        const isActuallyPlaying = Boolean(audioElement && !audioElement.paused && !audioElement.ended);
+        // Never on the HiFi route, so the spectrum keeps the idle breath there: there is no analyser on mpv's output.
+        const isActuallyPlaying = !isHifiActive && Boolean(audioElement && !audioElement.paused && !audioElement.ended);
         // Mid-handover a deck can be loading while the other one is still sounding. The analyser
         // is downstream of both, so it has real signal: dropping to the idle breath here would put
         // a visible stutter at exactly the moment meant to be seamless.
         const hasAudibleSignal = isActuallyPlaying || isTransitionAudible();
-        const isSoloistTimeline = isSoloistTimelineAudio(audioElement);
-        const soloistFrame = isSoloistTimeline ? latestSoloistCaptureFrame() : null;
+        const providerFrame = omni.readAudioAnalysisFrame(audioElement);
 
         if (backgroundHold) {
             // The bands keep their last values: nothing draws from them while held.
-        } else if (soloistFrame) {
+        } else if (providerFrame) {
             // Capture only analysis data from Soloist; no audio playback in Folia.
-            audioPower.set(soloistFrame.power);
-            audioBands.bass.set(soloistFrame.bass);
-            audioBands.lowMid.set(soloistFrame.lowMid);
-            audioBands.mid.set(soloistFrame.mid);
-            audioBands.vocal.set(soloistFrame.vocal);
-            audioBands.treble.set(soloistFrame.treble);
-            audioBands.spectrum?.set(Uint8Array.from(soloistFrame.spectrum));
-        } else if (!isSoloistTimeline && hasAudibleSignal && analyserRef.current) {
+            audioPower.set(providerFrame.power);
+            audioBands.bass.set(providerFrame.bass);
+            audioBands.lowMid.set(providerFrame.lowMid);
+            audioBands.mid.set(providerFrame.mid);
+            audioBands.vocal.set(providerFrame.vocal);
+            audioBands.treble.set(providerFrame.treble);
+            audioBands.spectrum?.set(Uint8Array.from(providerFrame.spectrum));
+        } else if (providerFrame === undefined && hasAudibleSignal && analyserRef.current) {
             const bufferLength = analyserRef.current.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             analyserRef.current.getByteFrequencyData(dataArray);
@@ -304,7 +305,19 @@ export function usePlaybackVisualizerBridge({
             audioBands.spectrum?.set(new Uint8Array(0));
         }
 
-        if (isActuallyPlaying && audioElement) {
+        if (isHifiActive) {
+            // Every frame, paused or not: the clock stands still while mpv is paused, and a seek while
+            // paused moves it. No end handling here - mpv reports the end itself.
+            const time = getHifiPosition();
+            currentTime.set(time);
+
+            const effectiveLyricTime = time - displayOffsetMsRef.current / 1000;
+            showLyricTime(effectiveLyricTime);
+
+            if (lyrics) {
+                showLine(findLatestActiveLineIndex(lyrics.lines, effectiveLyricTime));
+            }
+        } else if (isActuallyPlaying && audioElement) {
             const time = audioElement.currentTime;
             currentTime.set(time);
 
@@ -414,6 +427,7 @@ export function usePlaybackVisualizerBridge({
         lyricClipStartSec,
         isTransitionAudible,
         getDisplayElement,
+        isHifiActive,
     ]);
 
     // Every frame normally; while 后台节流 holds the lyrics, a slow timer that keeps only the clocks. The

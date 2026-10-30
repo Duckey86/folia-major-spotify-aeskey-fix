@@ -1,14 +1,8 @@
+import type { ProviderAudioAnalysisFrame } from '../../../types/onlineMusic';
+
 // Receives feature frames from a local, process-specific Windows WASAPI capture.
 // No audio samples or Spotify credentials cross Electron IPC.
-export type SoloistCaptureFrame = {
-    power: number;
-    bass: number;
-    lowMid: number;
-    mid: number;
-    vocal: number;
-    treble: number;
-    spectrum: number[];
-};
+export type SoloistCaptureFrame = ProviderAudioAnalysisFrame;
 let frame: SoloistCaptureFrame | null = null;
 let lastAt = 0;
 let installed = false;
