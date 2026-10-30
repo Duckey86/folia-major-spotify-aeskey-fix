@@ -7,6 +7,11 @@ on:
       - 'deploy/docker/VERSION'
   workflow_dispatch:
     inputs:
+      confirm_publish:
+        description: 'Confirm publication from an opted-in fork (ENABLE_DOCKER_STACK_PUBLISH=true)'
+        required: false
+        type: boolean
+        default: false
       force_republish:
         description: 'Allow rebuilding an existing version tag after a partial or broken publish'
         required: false
@@ -26,6 +31,11 @@ env:
 jobs:
   prepare:
     name: Validate Docker stack release
+    # Upstream keeps its release trigger; forks require both repository opt-in and manual confirmation.
+    if: >-
+      github.repository == 'chthollyphile/folia-major' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      vars.ENABLE_DOCKER_STACK_PUBLISH == 'true' && inputs.confirm_publish == true)
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}

@@ -17,7 +17,7 @@ on:
       - '**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cielo-canary-${{ github.event_name != 'workflow_dispatch' && 'rolling' || inputs.publish_mode == 'rolling' && 'rolling' || format('{0}-{1}', inputs.publish_mode, github.ref_name) }}
@@ -27,7 +27,11 @@ jobs:
   prepare:
     name: Prepare Cielo build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[canary]')
+    # Forks may explicitly build artifacts, but cannot publish upstream channel releases.
+    if: >-
+      (github.repository == 'chthollyphile/folia-major' &&
+      (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[canary]'))) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_mode == 'artifacts')
     outputs:
       version: ${{ steps.meta.outputs.version }}
       branch_name: ${{ steps.meta.outputs.branch_name }}
@@ -178,7 +182,9 @@ jobs:
     name: Publish Cielo prerelease
     runs-on: ubuntu-latest
     needs: [prepare, build]
-    if: needs.prepare.outputs.publish_mode != 'artifacts'
+    if: github.repository == 'chthollyphile/folia-major' && needs.prepare.outputs.publish_mode != 'artifacts'
+    permissions:
+      contents: write
 
     steps:
       - name: Download packaged artifacts

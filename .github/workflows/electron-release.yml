@@ -23,6 +23,8 @@ concurrency:
 jobs:
   validate-release:
     name: Validate Realeco release metadata
+    # Realeco and its AUR package belong to upstream, not personal Soloist forks.
+    if: github.repository == 'chthollyphile/folia-major'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.validate.outputs.version }}

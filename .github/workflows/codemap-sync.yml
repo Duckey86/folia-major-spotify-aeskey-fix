@@ -21,6 +21,9 @@ jobs:
     name: Regenerate code map
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      # Forks still generate the map, but never need an upstream administrator token.
+      CODEMAP_CAN_PUSH: ${{ github.repository == 'chthollyphile/folia-major' && secrets.CODEMAP_PUSH_TOKEN != '' }}
 
     steps:
       - name: Check out Git repository
@@ -31,7 +34,8 @@ jobs:
           # 在临时分支上用 workflow_dispatch 补跑的检查 GitHub 也不认，直接推和走 PR 合并都报
           # “2 of 2 required status checks are expected”（run 40492106867、40495357734）。
           # 保护规则只约束非管理员，所以用仓库管理员的 PAT（只授本仓库 contents: write）推送。
-          token: ${{ secrets.CODEMAP_PUSH_TOKEN }}
+          token: ${{ github.repository == 'chthollyphile/folia-major' && secrets.CODEMAP_PUSH_TOKEN || github.token }}
+          persist-credentials: ${{ env.CODEMAP_CAN_PUSH == 'true' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v6
@@ -43,6 +47,7 @@ jobs:
         run: npm run codemap
 
       - name: Commit and push when the map moved
+        if: env.CODEMAP_CAN_PUSH == 'true'
         run: |
           if git diff --quiet -- docs/CODEMAP.md; then
             echo "代码地图已经是最新的，无需提交。"
@@ -61,3 +66,8 @@ jobs:
             exit 0
           fi
           git push origin HEAD:main
+
+      - name: Report read-only regeneration
+        if: env.CODEMAP_CAN_PUSH != 'true'
+        run: |
+          echo "Code map generation passed. Automatic commits are limited to upstream with CODEMAP_PUSH_TOKEN configured." >> "$GITHUB_STEP_SUMMARY"

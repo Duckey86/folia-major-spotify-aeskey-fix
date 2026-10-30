@@ -7,6 +7,11 @@ on:
       - 'sync-server/package.json'
   workflow_dispatch:
     inputs:
+      confirm_publish:
+        description: 'Confirm publication from an opted-in fork (ENABLE_SYNC_SERVER_DOCKER_PUBLISH=true)'
+        required: false
+        type: boolean
+        default: false
       force_republish:
         description: 'Allow rebuilding an existing version tag after a partial or broken publish'
         required: false
@@ -27,6 +32,11 @@ env:
 jobs:
   prepare:
     name: Validate sync-server release
+    # A sync-server version change imported from upstream must not publish from a fork.
+    if: >-
+      github.repository == 'chthollyphile/folia-major' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      vars.ENABLE_SYNC_SERVER_DOCKER_PUBLISH == 'true' && inputs.confirm_publish == true)
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}
