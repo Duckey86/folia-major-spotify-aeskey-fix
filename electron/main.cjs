@@ -260,6 +260,7 @@ if (process.platform === 'darwin' && process.arch === 'x64') {
 const store = new Store({ projectName: 'Folia' });
 // Personal Windows build: a companion started only for this Folia process.
 const soloistManager = createSoloistManager({ app, BrowserWindow, ipcMain, safeStorage });
+soloistManager.registerSetupIpc({ ipcMain, dialog, shell, isTrusted: event => isTrustedMainWindowContents(event.sender) });
 // Before ready: the GPU process reads its switches when it starts.
 const gpuPreferenceApplied = applyGpuPreference({ app, store });
 const readActiveGpu = createActiveGpuReader(app);
@@ -5830,7 +5831,7 @@ app.whenReady().then(async () => {
   }
 
   if (app.isPackaged || process.env.FOLIA_SOLOIST_AUTOSTART === '1') {
-    void soloistManager.start().catch(error => console.warn('[Soloist] Startup failed:', error.message));
+    void soloistManager.start().catch(() => console.warn('[Soloist] Startup failed; reopen setup in the account window'));
   }
 
   if (process.platform === 'win32') {

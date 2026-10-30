@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+    // Configuration is main-frame-only; status never returns the saved credential.
+    soloistSetup: (action, payload) => ipcRenderer.invoke('soloist-setup', action, payload),
     webUtils: {
       // File.path was removed in modern Electron; this is the supported way to
       // resolve the OS path of a dropped file from the renderer.

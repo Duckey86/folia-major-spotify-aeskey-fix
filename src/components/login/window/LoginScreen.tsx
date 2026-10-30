@@ -25,6 +25,7 @@ import PlatformColumn from './PlatformColumn';
 // 和处理一起由 LoginHost 给；哪一句、引谁的话这些规则在 loginView.ts。
 
 export type LoginScreenProps = {
+    setup?: React.ReactNode;
     isOpen: boolean;
     onClose: () => void;
     /** 排好顺序的平台。 */
@@ -74,7 +75,7 @@ const useReached = (at: number): boolean => {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
     isOpen, onClose, rows, activeProviderId, chosen, login, onChoose, onStart, onSelectMethod, onReopenBrowser, onRestartService, onSwitch, onSignOut,
-    buildReport, origin, done = false, onDoneLeave = nothing, onDoneEnd = nothing,
+    buildReport, origin, done = false, onDoneLeave = nothing, onDoneEnd = nothing, setup,
 }) => {
     const { t } = useTranslation();
     const still = useKitReducedMotion();
@@ -186,7 +187,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             closeTip={t('home.closeLogin')}
             providerId={providerId}
             providerLabel={label}
-            rings={scene === 'code' || scene === 'browser'}
+            rings={!setup && (scene === 'code' || scene === 'browser')}
             origin={origin}
             quiet={shownDone}
             leavesThrough={shownDone}
@@ -240,6 +241,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     steps={stepMarks(scene, inBrowser)}
                 />
             )}
+            before={setup}
             below={details ? <Unfold open={detailsOpen}>{details}</Unfold> : undefined}
         />
         {shownDone && providerId && <LoginDoneFlight parts={doneParts} providerId={providerId} label={label} user={summary?.user ?? null} />}

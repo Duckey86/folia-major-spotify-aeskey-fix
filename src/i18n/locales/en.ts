@@ -1,6 +1,52 @@
 
 
 export default {
+  "soloist": {
+    "title": "Spotify Soloist",
+    "intro": "Set up Spotify audio here. Sign in to Spotify below for your library and lyrics; Soloist handles playback separately.",
+    "step1": "Generate your personal API key",
+    "step2": "Paste the API key into Folia",
+    "step3": "Locate or download Soloist",
+    "step4": "Save and start Soloist",
+    "step5": "Pair with Spotify Connect",
+    "generateKey": "Generate Soloist API Key",
+    "personalKey": "Sign in to Spotify for Developers with your own Premium account and generate a personal key.",
+    "apiKey": "Soloist API key",
+    "keyPrivacy": "Your key is sent only to the local companion and stored with operating-system encryption. It is never included in logs or telemetry.",
+    "keySaved": "A key is already configured. You do not need to paste it again.",
+    "executableHelp": "If Soloist was detected, keep the selected file. Otherwise download the Windows x86_64 archive from Spotify, extract it, then select soloist.exe. Folia does not bundle Soloist.",
+    "locate": "Locate soloist.exe",
+    "download": "Official Soloist Downloads",
+    "saveStart": "Save and start Soloist",
+    "saving": "Saving…",
+    "pairing": "Open the Spotify app on the same local network. Play a song, open the device picker (Connect to a device), and select “Folia Audio”. Keep Soloist running. When pairing succeeds, this status changes to Connected automatically. If the device is missing, check your firewall and local-network access, then Reconnect.",
+    "memoryOnly": "OS encryption is unavailable. The key is kept only for this run; you will need to enter it again after restarting Folia.",
+    "external": "Using a Soloist process started outside Folia. Reconnect checks its connection without stopping it. To change its key or executable, stop that process yourself, then save and start here.",
+    "changeKey": "Change API Key",
+    "cancelKey": "Cancel key change",
+    "reconnect": "Reconnect",
+    "openGuide": "Open Soloist Setup Guide",
+    "hideGuide": "Hide Setup Guide",
+    "officialGuide": "Spotify’s Official Guide",
+    "states": {
+      "not-configured": "Not Configured",
+      "starting": "Starting",
+      "waiting-for-pairing": "Waiting for Pairing",
+      "connected": "Connected",
+      "error": "Error"
+    },
+    "errors": {
+      "missing-executable": "Soloist executable not found. Download and extract the official Windows build, then locate soloist.exe and save.",
+      "invalid-key": "The API key is invalid or was rejected. Generate a personal key with your Premium account, choose Change API Key, paste it, then save and start again.",
+      "build-expired": "This Soloist build has expired. Download a newer official build, extract it, select the new executable, then save and start again.",
+      "startup-failed": "Soloist could not start or exited unexpectedly. Check file permissions, audio output and whether another instance uses its data directory. Try Reconnect, or select a fresh official build.",
+      "startup-timeout": "Soloist did not respond on localhost port 9090. Check whether another program uses that port or a firewall blocks local connections, then Reconnect.",
+      "pairing-timeout": "Pairing is taking longer than expected. In Spotify on the same network, select Folia Audio. Check local-network permissions and your firewall. You can Reconnect to try again; pairing is still monitored.",
+      "connection-lost": "The connection to Soloist was lost. Folia is checking again automatically. If it does not recover, choose Reconnect and select Folia Audio in Spotify.",
+      "save-failed": "Could not save the configuration securely. Check access to Folia’s data folder and try again. The key has not been written as plaintext.",
+      "setup-failed": "Could not reach the local setup service. Reopen this window or restart Folia, then try again."
+    }
+  },
   "libraryBravais": {
     "suiteName": "Bravais wall",
     "homeTitle": "Library",
@@ -590,6 +636,7 @@ export default {
       }
     },
     "commands": {
+      "soloist-setup": {"title":"Spotify Soloist setup","description":"Configure the personal playback companion"},
       "settings-ponder-hints": { "title": "Ponder tutorial hints", "description": "Choose when the hold-G tutorial hint appears" },
       "ponder-hints-always": { "title": "Ponder hints: always show", "description": "Show the hold-G hint on every teachable control" },
       "ponder-hints-unseen": { "title": "Ponder hints: only where I have not looked", "description": "Stop hinting a control once its tutorial has been watched" },

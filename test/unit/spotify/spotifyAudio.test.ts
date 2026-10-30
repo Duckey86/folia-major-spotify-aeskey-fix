@@ -151,7 +151,7 @@ describe('Spotify audio', () => {
         openSession.mockImplementation(async () => {
             const session = await original();
             const resolve = session.resolveAudioFileAsync;
-            session.resolveAudioFileAsync = vi.fn(async ({ bitrate }: { bitrate: number }) => {
+            session.resolveAudioFileAsync = vi.fn(async ({ bitrate }: { bitrate: number } = { bitrate: 320 }) => {
                 if (bitrate === 320) throw new Error('audio key unavailable: Error { kind: Unavailable, error: AesKey }');
                 return { ...await resolve(), format: 'OGG_VORBIS_160' };
             });

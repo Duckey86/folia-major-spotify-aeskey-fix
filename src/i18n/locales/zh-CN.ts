@@ -1,6 +1,52 @@
 
 
 export default {
+  "soloist": {
+    "title": "Spotify Soloist",
+    "intro": "在这里完成 Spotify 音频设置。下方的 Spotify 登录用于资料库和歌词，Soloist 单独负责播放。",
+    "step1": "生成个人 API 密钥",
+    "step2": "将 API 密钥粘贴到 Folia",
+    "step3": "选择或下载 Soloist",
+    "step4": "保存配置并启动 Soloist",
+    "step5": "通过 Spotify Connect 配对",
+    "generateKey": "生成 Soloist API 密钥",
+    "personalKey": "使用你自己的 Premium 账号登录 Spotify 开发者平台，生成个人密钥。",
+    "apiKey": "Soloist API 密钥",
+    "keyPrivacy": "密钥仅发送给本机 Soloist，并通过操作系统加密保存，不会写入日志或遥测数据。",
+    "keySaved": "已配置密钥，无需再次粘贴。",
+    "executableHelp": "若已检测到 Soloist，可保留当前文件。否则从 Spotify 下载 Windows x86_64 压缩包，解压后选择 soloist.exe。Folia 不附带 Soloist。",
+    "locate": "选择 soloist.exe",
+    "download": "Soloist 官方下载",
+    "saveStart": "保存并启动 Soloist",
+    "saving": "正在保存…",
+    "pairing": "在同一局域网内打开 Spotify 应用，播放一首歌，打开设备选择器（连接到设备），选择“Folia Audio”。请保持 Soloist 运行。配对成功后，此处会自动显示“已连接”。若找不到设备，请检查防火墙和本地网络访问权限，再点击“重新连接”。",
+    "memoryOnly": "操作系统加密暂不可用。密钥仅在本次运行中保留，重启 Folia 后需重新输入。",
+    "external": "正在使用 Folia 之外启动的 Soloist。“重新连接”只检查连接，不会结束该进程。若要更换它的密钥或程序，请先自行关闭该进程，再在这里保存并启动。",
+    "changeKey": "更换 API 密钥",
+    "cancelKey": "取消更换密钥",
+    "reconnect": "重新连接",
+    "openGuide": "打开 Soloist 设置指南",
+    "hideGuide": "收起设置指南",
+    "officialGuide": "Spotify 官方指南",
+    "states": {
+      "not-configured": "未配置",
+      "starting": "正在启动",
+      "waiting-for-pairing": "等待配对",
+      "connected": "已连接",
+      "error": "连接出错"
+    },
+    "errors": {
+      "missing-executable": "找不到 Soloist 程序。请下载并解压官方 Windows 版本，选择 soloist.exe，然后保存。",
+      "invalid-key": "API 密钥无效或被拒绝。请用自己的 Premium 账号生成个人密钥，点击“更换 API 密钥”，粘贴后重新保存并启动。",
+      "build-expired": "此 Soloist 版本已过期。请下载并解压官方新版本，选择新的程序文件，再保存并启动。",
+      "startup-failed": "Soloist 无法启动或意外退出。请检查文件权限、音频输出，以及是否有其他实例占用其数据目录。可尝试重新连接，或选择最新官方版本。",
+      "startup-timeout": "Soloist 未在本机 9090 端口响应。请检查是否有其他程序占用该端口，或防火墙拦截本地连接，然后重新连接。",
+      "pairing-timeout": "配对等待时间较长。请在同一网络的 Spotify 中选择 Folia Audio，检查本地网络权限和防火墙。也可点击“重新连接”重试，Folia 仍在检测配对结果。",
+      "connection-lost": "与 Soloist 的连接已断开，Folia 正在自动重试。若无法恢复，请点击“重新连接”，并在 Spotify 中选择 Folia Audio。",
+      "save-failed": "无法安全保存配置。请检查 Folia 数据目录的访问权限后重试。密钥未以明文写入。",
+      "setup-failed": "无法连接本机设置服务。请重新打开此窗口或重启 Folia 后重试。"
+    }
+  },
   "libraryBravais": {
     "suiteName": "Bravais 墙面",
     "homeTitle": "书库",
@@ -590,6 +636,7 @@ export default {
       }
     },
     "commands": {
+      "soloist-setup": {"title":"Spotify Soloist 设置","description":"配置个人播放程序"},
       "settings-ponder-hints": { "title": "思索教程提示", "description": "设置长按 G 的提示什么时候出现" },
       "ponder-hints-always": { "title": "思索提示：始终显示", "description": "所有可教学的控件都提示长按 G" },
       "ponder-hints-unseen": { "title": "思索提示：仅未看过的区域", "description": "某个控件的教程看过之后就不再提示它" },

@@ -189,13 +189,6 @@
           ]
         },
         {
-          "from": "build/soloist-local",
-          "to": "soloist",
-          "filter": [
-            "soloist.exe"
-          ]
-        },
-        {
           "from": "build/soloist-capture",
           "to": "soloist-capture",
           "filter": [

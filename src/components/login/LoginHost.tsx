@@ -11,6 +11,7 @@ import { createLoginHostState } from './loginHostState';
 import { closeLoginWindow, loginHostMounted, setLoginLanding, useLoginWindowStore } from './loginWindowStore';
 import { orderRows } from './platformRows';
 import LoginScreen from './window/LoginScreen';
+import { hasProviderSetup, ProviderSetup, useProviderSetupOnboarding } from './providerSetupRegistry';
 
 // src/components/login/LoginHost.tsx
 // 登录窗口：App 最外层挂一个（换 suite、离开首页都不卸载），由 loginWindowStore 的 openLoginWindow 打开。它把三样东西接在一起：
@@ -25,6 +26,7 @@ type LoginHostProps = {
 const selectCompletion = (snapshot: LibraryAccountSnapshot) => snapshot.lastLoginCompletion;
 
 const LoginHost: React.FC<LoginHostProps> = ({ account }) => {
+    useProviderSetupOnboarding();
     const requestId = useLoginWindowStore(state => state.requestId);
     const isOpen = useLoginWindowStore(state => state.isOpen);
     const origin = useLoginWindowStore(state => state.origin);
@@ -110,6 +112,7 @@ const LoginHost: React.FC<LoginHostProps> = ({ account }) => {
             activeProviderId={activeProviderId}
             chosen={chosen}
             login={shownLogin}
+            setup={isOpen && hasProviderSetup(providerId) ? <ProviderSetup key={providerId} providerId={providerId} /> : undefined}
             onChoose={host.choose}
             onStart={() => void account.retryLogin()}
             onSelectMethod={methodId => void account.selectLoginMethod(methodId)}

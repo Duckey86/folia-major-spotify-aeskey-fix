@@ -1,6 +1,52 @@
 
 
 export default {
+  "soloist": {
+    "title": "Spotify Soloist",
+    "intro": "Atur audio Spotify di sini. Masuk ke Spotify di bawah untuk pustaka dan lirik; Soloist menangani pemutaran secara terpisah.",
+    "step1": "Buat kunci API pribadi",
+    "step2": "Tempel kunci API ke Folia",
+    "step3": "Cari atau unduh Soloist",
+    "step4": "Simpan dan mulai Soloist",
+    "step5": "Pasangkan melalui Spotify Connect",
+    "generateKey": "Buat Kunci API Soloist",
+    "personalKey": "Masuk ke Spotify for Developers dengan akun Premium Anda sendiri dan buat kunci pribadi.",
+    "apiKey": "Kunci API Soloist",
+    "keyPrivacy": "Kunci hanya dikirim ke Soloist lokal dan disimpan dengan enkripsi sistem operasi. Kunci tidak disertakan dalam log atau telemetri.",
+    "keySaved": "Kunci sudah dikonfigurasi. Anda tidak perlu menempelkannya lagi.",
+    "executableHelp": "Jika Soloist terdeteksi, gunakan berkas yang dipilih. Jika belum, unduh arsip Windows x86_64 dari Spotify, ekstrak, lalu pilih soloist.exe. Folia tidak menyertakan Soloist.",
+    "locate": "Cari soloist.exe",
+    "download": "Unduhan Resmi Soloist",
+    "saveStart": "Simpan dan mulai Soloist",
+    "saving": "Menyimpan…",
+    "pairing": "Buka aplikasi Spotify di jaringan lokal yang sama. Putar lagu, buka pemilih perangkat (Hubungkan ke perangkat), lalu pilih “Folia Audio”. Biarkan Soloist berjalan. Status berubah menjadi Terhubung secara otomatis setelah berhasil. Jika perangkat tidak muncul, periksa firewall dan izin jaringan lokal, lalu hubungkan ulang.",
+    "memoryOnly": "Enkripsi sistem operasi tidak tersedia. Kunci hanya disimpan untuk sesi ini; masukkan kembali setelah memulai ulang Folia.",
+    "external": "Menggunakan Soloist yang dimulai di luar Folia. Hubungkan Ulang memeriksa koneksi tanpa menghentikannya. Untuk mengganti kunci atau program, hentikan proses itu sendiri, lalu simpan dan mulai di sini.",
+    "changeKey": "Ganti Kunci API",
+    "cancelKey": "Batalkan penggantian kunci",
+    "reconnect": "Hubungkan Ulang",
+    "openGuide": "Buka Panduan Pengaturan Soloist",
+    "hideGuide": "Tutup Panduan",
+    "officialGuide": "Panduan Resmi Spotify",
+    "states": {
+      "not-configured": "Belum Dikonfigurasi",
+      "starting": "Memulai",
+      "waiting-for-pairing": "Menunggu Pemasangan",
+      "connected": "Terhubung",
+      "error": "Kesalahan"
+    },
+    "errors": {
+      "missing-executable": "Program Soloist tidak ditemukan. Unduh dan ekstrak versi Windows resmi, cari soloist.exe, lalu simpan.",
+      "invalid-key": "Kunci API tidak valid atau ditolak. Buat kunci pribadi dengan akun Premium Anda, pilih Ganti Kunci API, tempel, lalu simpan dan mulai lagi.",
+      "build-expired": "Versi Soloist ini kedaluwarsa. Unduh versi resmi terbaru, ekstrak, pilih program baru, lalu simpan dan mulai lagi.",
+      "startup-failed": "Soloist gagal dimulai atau berhenti mendadak. Periksa izin berkas, keluaran audio, dan apakah proses lain memakai direktori datanya. Coba Hubungkan Ulang atau pilih versi resmi terbaru.",
+      "startup-timeout": "Soloist tidak merespons pada port lokal 9090. Periksa apakah program lain memakai port itu atau firewall memblokir koneksi lokal, lalu hubungkan ulang.",
+      "pairing-timeout": "Pemasangan memerlukan waktu lebih lama. Pilih Folia Audio di Spotify pada jaringan yang sama. Periksa izin jaringan lokal dan firewall. Coba Hubungkan Ulang; pemasangan masih dipantau.",
+      "connection-lost": "Koneksi ke Soloist terputus. Folia mencoba lagi secara otomatis. Jika belum pulih, pilih Hubungkan Ulang dan Folia Audio di Spotify.",
+      "save-failed": "Konfigurasi tidak dapat disimpan dengan aman. Periksa akses ke folder data Folia lalu coba lagi. Kunci tidak ditulis sebagai teks biasa.",
+      "setup-failed": "Layanan pengaturan lokal tidak dapat dijangkau. Buka kembali jendela ini atau mulai ulang Folia, lalu coba lagi."
+    }
+  },
   "libraryBravais": {
     "suiteName": "Dinding Bravais",
     "homeTitle": "Pustaka",
@@ -590,6 +636,7 @@ export default {
       }
     },
     "commands": {
+      "soloist-setup": {"title":"Pengaturan Spotify Soloist","description":"Atur program pemutaran pribadi"},
       "settings-ponder-hints": { "title": "Petunjuk tutorial Ponder", "description": "Atur kapan petunjuk tahan G muncul" },
       "ponder-hints-always": { "title": "Petunjuk Ponder: selalu tampilkan", "description": "Tampilkan petunjuk tahan G pada setiap kontrol yang bisa dipelajari" },
       "ponder-hints-unseen": { "title": "Petunjuk Ponder: hanya yang belum dilihat", "description": "Berhenti memberi petunjuk setelah tutorialnya ditonton" },

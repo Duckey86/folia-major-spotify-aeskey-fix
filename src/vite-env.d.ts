@@ -764,6 +764,7 @@ declare global {
 
   interface Window {
     electron?: {
+      soloistSetup?: (action: string, payload?: string) => Promise<unknown>;
       onSoloistAudioFrame?: (callback: (frame: import('./services/onlineMusic/spotify/soloistCaptureFeed').SoloistCaptureFrame) => void) => () => void;
       webUtils?: {
         /** Resolves the OS path of a dropped File (File.path was removed in modern Electron). */
