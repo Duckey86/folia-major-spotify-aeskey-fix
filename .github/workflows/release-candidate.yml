@@ -31,6 +31,8 @@ concurrency:
 jobs:
   prepare-release:
     name: Prepare pre-release metadata
+    # This workflow prepares upstream release channels, not Soloist installers.
+    if: github.repository == 'chthollyphile/folia-major'
     runs-on: ubuntu-latest
     outputs:
       base_version: ${{ steps.meta.outputs.base_version }}
