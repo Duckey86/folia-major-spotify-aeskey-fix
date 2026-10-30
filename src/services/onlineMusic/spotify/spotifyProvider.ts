@@ -18,7 +18,8 @@ import { spotifyMutations } from './spotifyMutations';
 import { resetSpotifyRecommendations, spotifyRecommendations } from './spotifyRecommendations';
 import { describeSpotifyLoginFailure, spotifyLoginFailure } from './spotifyLoginFailure';
 import { describeSpotifyFailure } from './spotifyFailure';
-import { useSpotifySoloist, soloistSource } from './spotifySoloist';
+import { useSpotifySoloist, soloistSource, isSoloistTimelineAudio } from './spotifySoloist';
+import { latestSoloistCaptureFrame } from './soloistCaptureFeed';
 
 // src/services/onlineMusic/spotify/spotifyProvider.ts
 // Spotify adapter. Sign-in happens in the browser where the person is already signed in to
@@ -131,6 +132,9 @@ export const spotifyProvider: OnlineMusicProvider = {
         },
     },
     playback: {
+        readAudioAnalysisFrame(audio) {
+            return isSoloistTimelineAudio(audio) ? latestSoloistCaptureFrame() : undefined;
+        },
         async getSongDetail(id) {
             const track = (await querySpotify<TrackAnswer>('getTrack', { uri: spotifyUri('track', String(id)) })).trackUnion;
             return spotifySongOf(track && { ...track, artists: { items: [...(track.firstArtist?.items ?? []), ...(track.otherArtists?.items ?? [])] } });

@@ -2,6 +2,7 @@ import { DEFAULT_PERSONAL_FM_CATALOG } from './fmModes';
 import type { SongResult, UnifiedSong } from '../../types';
 import type {
     AudioQualityPreference,
+    ProviderAudioAnalysisFrame,
     LoginStep,
     MediaId,
     OmniAudioSource,
@@ -80,6 +81,10 @@ import type { AccountReadOutcome, AccountReadReason } from './account/accountRea
 
 
 type PageInput = { limit: number; offset: number };
+
+// Cache analysis providers by registry version so animation frames do not rebuild the list.
+let audioAnalysisProvidersVersion = -1;
+let audioAnalysisProviders: OnlineMusicProvider[] = [];
 
 // The quality levels, lowest first.
 const AUDIO_QUALITY_LEVELS: readonly AudioQualityPreference[] = ['standard', 'high', 'ultra', 'lossless', 'hires'];
@@ -857,6 +862,12 @@ export const omni = {
         return withActiveProvider(async provider => provider.explore?.getSectionItems?.(cursor) ?? { items: [] });
     },
 
+    // The provider's `explore.songsShownAs`, or null where it has none (see `OnlineExploreProvider`).
+    exploreSongsShownAs(providerId: OmniProviderId): ((songs: UnifiedSong[]) => Promise<Map<string, UnifiedSong | null>>) | null {
+        const explore = getOnlineMusicProvider(providerId)?.explore;
+        return explore?.songsShownAs ? songs => explore.songsShownAs!(songs) : null;
+    },
+
     async getSongDetail(providerId: OmniProviderId, id: MediaId): Promise<UnifiedSong | null> {
         return requireOnlineMusicProvider(providerId).playback?.getSongDetail(id) ?? null;
     },
@@ -908,6 +919,21 @@ export const omni = {
 
     canPlaySong(song: SongResult): boolean {
         return Boolean(getOnlineMusicProviderForSong(song)?.playback);
+    },
+
+    // Resolve ownership from the displayed element, which can differ from the active song during a handover.
+    readAudioAnalysisFrame(audio: HTMLAudioElement | null): ProviderAudioAnalysisFrame | null | undefined {
+        if (!audio) return undefined;
+        const version = getOnlineMusicProviderRegistryVersion();
+        if (audioAnalysisProvidersVersion !== version) {
+            audioAnalysisProviders = listOnlineMusicProviders().filter(provider => provider.playback?.readAudioAnalysisFrame);
+            audioAnalysisProvidersVersion = version;
+        }
+        for (const provider of audioAnalysisProviders) {
+            const frame = provider.playback?.readAudioAnalysisFrame?.(audio);
+            if (frame !== undefined) return frame;
+        }
+        return undefined;
     },
 
     // The quality levels a provider tells apart, lowest first (`OnlinePlaybackProvider.audioQualityLevels`;

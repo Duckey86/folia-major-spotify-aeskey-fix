@@ -29,12 +29,16 @@ const RESOLVED_VIRTUAL_MODULE_ID = `\0${VIRTUAL_MODULE_ID}`;
 
 const ZH_LOCALE_PATH = path.join(ROOT, 'src/i18n/locales/zh-CN.ts');
 const COMMANDS_DIR = path.join(ROOT, 'src/components/command-palette/commands');
-const COMMAND_FACTORIES_PATH = path.join(ROOT, 'src/components/command-palette/commandFactories.ts');
+const SOLOIST_SETUP_ENTRY_PATH = path.join(ROOT, 'src/components/spotify/setupEntry.tsx');
 const LIBRARY_SUITES_DIR = path.join(ROOT, 'src/library/suites');
 /** library suite 的外观动作（manifest 的 chromeActions）只能声明在这两种文件里，关键词才会生成拼音。 */
 const SUITE_CHROME_FILE_NAMES = ['entry.ts', 'chromeActions.ts'];
 const VISUALIZER_DIR = path.join(ROOT, 'src/components/visualizer');
 const MODE_ENTRY_FILE = 'entry.tsx';
+const COMMAND_FACTORIES_PATH = path.join(
+    ROOT,
+    'src/components/command-palette/commandFactories.ts',
+);
 
 const parse = (filePath) => parseAst(fs.readFileSync(filePath, 'utf8'), { lang: filePath.endsWith('.tsx') ? 'tsx' : 'ts' });
 
@@ -145,6 +149,7 @@ const collectCommandSynonymPhrases = (sink) => {
         .filter(name => name.endsWith('.ts'))
         .map(name => path.join(COMMANDS_DIR, name));
     files.push(COMMAND_FACTORIES_PATH);
+    files.push(SOLOIST_SETUP_ENTRY_PATH);
     files.forEach(filePath => collectCjkStrings(parse(filePath), sink));
 };
 
@@ -235,8 +240,12 @@ export const renderDictionary = () => {
 };
 
 /** 源文件变了就让虚拟模块失效——否则 dev 下改了中文文案，拼音还是旧的。 */
-const WATCHED_PATHS = [ZH_LOCALE_PATH, COMMANDS_DIR, COMMAND_FACTORIES_PATH];
-
+const WATCHED_PATHS = [
+    ZH_LOCALE_PATH,
+    COMMANDS_DIR,
+    COMMAND_FACTORIES_PATH,
+    SOLOIST_SETUP_ENTRY_PATH,
+];
 /** `src/library/suites/<id>/entry.ts` 或 `chromeActions.ts`（新增的 suite 也算，所以按形状判断而不是按清单）。 */
 const isSuiteChromePath = (changedPath) => (
     path.dirname(path.dirname(changedPath)) === LIBRARY_SUITES_DIR

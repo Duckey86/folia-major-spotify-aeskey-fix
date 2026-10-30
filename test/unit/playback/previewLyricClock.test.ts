@@ -37,6 +37,7 @@ vi.mock('@/stores/usePlaybackStore', () => ({
 vi.mock('@/services/onlineMusic/omni', () => ({ omni: {
     previewClipStartMsOfAudioSource: env.lookup,
     audioSourceMetadataVersion: () => env.version,
+    readAudioAnalysisFrame: vi.fn(() => null),
 } }));
 vi.mock('@/hooks/useBeatFxTrack', () => ({ useBeatFxTrack: () => false }));
 vi.mock('@/services/beatFx/beatFxLive', () => ({ tickBeatFx: vi.fn() }));

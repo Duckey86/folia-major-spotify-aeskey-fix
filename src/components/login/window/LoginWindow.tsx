@@ -95,6 +95,8 @@ type LoginWindowProps = {
     column: (lie: 'column' | 'row') => React.ReactNode;
     tile: React.ReactNode;
     message: React.ReactNode;
+    /** Optional provider setup, before account sign-in so first-run instructions are immediately visible. */
+    before?: React.ReactNode;
     /** 那一块画和话的下面：展开的详情。只有它让窗口变高，往下长。 */
     below?: React.ReactNode;
     /** 按下去打开窗口的那个东西在哪：窗口从那一边出来。 */
@@ -108,7 +110,7 @@ type LoginWindowProps = {
 };
 
 export const LoginWindow: React.FC<LoginWindowProps> = ({
-    isOpen, onClose, title, closeTip, providerId, providerLabel, rings, column, tile, message, below, origin = null, overlay, quiet = false, leavesThrough = false,
+    isOpen, onClose, title, closeTip, providerId, providerLabel, rings, column, tile, message, before, below, origin = null, overlay, quiet = false, leavesThrough = false,
 }) => {
     const narrow = useNarrow();
     const still = useKitReducedMotion();
@@ -159,8 +161,9 @@ export const LoginWindow: React.FC<LoginWindowProps> = ({
                 )}
                 overlay={overlay && <div className="absolute inset-0" style={colour}>{overlay(narrow)}</div>}
             >
-                <div style={colour} data-login-still={still || undefined} className={narrow ? 'flex flex-col gap-4' : 'pb-1 pt-[70px]'}>
+                <div style={colour} data-login-still={still || undefined} className={narrow ? 'flex flex-col gap-4' : before ? 'pb-1 pt-1' : 'pb-1 pt-[70px]'}>
                     {narrow && <div className={`-mx-2 ${fades}`}>{column('row')}</div>}
+                    {before}
                     <div className={narrow ? 'flex flex-col items-center gap-4' : 'flex gap-6'}>
                         {tile}
                         <div className={`${narrow ? 'flex w-full min-w-0' : 'flex min-w-0 flex-1'} ${fades}`}>{message}</div>

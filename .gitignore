@@ -99,3 +99,12 @@ dist-runtime/
 
 # Locally downloaded Spotify Soloist binary: never redistribute or commit.
 /build/soloist-local/
+
+# Generated native Soloist capture helper and CMake build tree.
+/build/soloist-capture/
+/build/.soloist-capture-cmake/
+
+# Personal Soloist executables and saved setup credentials, wherever placed.
+soloist.exe
+soloist-api-key.enc
+soloist-config.json

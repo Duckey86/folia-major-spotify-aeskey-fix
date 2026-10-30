@@ -7,22 +7,40 @@ import type { OnlineFailureDetail, OnlineFailureOperation } from '../../../types
 // said here only (they are made in electron/spotify/). A network that fails and 5xx come as
 // `network` and need nothing here.
 
-// electron/spotify/errors.cjs gives Spotify's 429 this sentence, under the code of a network that fails.
-const ASKED_TO_WAIT = 'Spotify asked to wait before trying again';
+// The desktop side's sentences that name a case: Spotify's 429 (electron/spotify/errors.cjs), and
+// Spotify refusing a track's key before and after it gave this account one in this run
+// (electron/spotify/audio.cjs).
+const NAMED: Record<string, OnlineFailureDetail> = {
+    'Spotify asked to wait before trying again': {
+        case: 'retry-later',
+        httpStatus: 429,
+    },
+    'Spotify gives this account no audio key': {
+        case: 'account-refused',
+    },
+    'Spotify refused the audio key for now': {
+        case: 'retry-later',
+    },
+};
 
-// If both encodings are refused, the account cannot obtain audio from the native
-// provider. Report an unavailable audio source rather than an unspecified failure.
-const AUDIO_KEY_REFUSALS = new Set([
-    'Spotify refused the audio key',
-    'Spotify refused the audio key at both available qualities',
-]);
+export const describeSpotifyFailure = (
+    _operation: OnlineFailureOperation,
+    error: unknown,
+): OnlineFailureDetail | null => {
+    if (
+        !(error instanceof OnlineProviderError) ||
+        error.providerId !== 'spotify'
+    ) {
+        return null;
+    }
 
-export const describeSpotifyFailure = (_operation: OnlineFailureOperation, error: unknown): OnlineFailureDetail | null => (
-    error instanceof OnlineProviderError && error.providerId === 'spotify'
-        ? error.code === 'network' && error.message === ASKED_TO_WAIT
-            ? { case: 'retry-later', httpStatus: 429 }
-            : error.code === 'unavailable' && AUDIO_KEY_REFUSALS.has(error.message)
-                ? { case: 'no-audio' }
-                : null
-        : null
-);
+    // Preserve upstream v0.7.23 error classification.
+    if (Object.hasOwn(NAMED, error.message)) {
+        return NAMED[error.message];
+    }
+
+    // Native playback's bitrate fallback preserves the named account/temporary cases above.
+    // A refused key is not evidence that the track has no audio; Soloist uses a separate path.
+
+    return null;
+};

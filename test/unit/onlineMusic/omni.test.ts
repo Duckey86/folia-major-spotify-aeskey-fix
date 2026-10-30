@@ -58,6 +58,41 @@ afterEach(() => {
 });
 
 describe('omni routing', () => {
+    it('routes analysis by displayed element and preserves the external no-frame state', () => {
+        const audio = { currentSrc: 'blob:external', src: 'blob:external' } as HTMLAudioElement;
+        const ordinaryAudio = { currentSrc: 'file:///song.wav', src: 'file:///song.wav' } as HTMLAudioElement;
+        const owner = provider(providerId, undefined);
+        const frame = { power: 0.5, bass: 0.2, lowMid: 0.3, mid: 0.4, vocal: 0.5, treble: 0.6, spectrum: [10, 20] };
+        let latest: typeof frame | null = null;
+        owner.playback!.readAudioAnalysisFrame = element => element === audio ? latest : undefined;
+        registerOnlineMusicProvider(owner);
+
+        // The active browsing provider is unrelated to the element still displayed during a handover.
+        useOnlineProviderAccountStore.getState().setActiveProviderId(otherProviderId);
+        expect(omni.readAudioAnalysisFrame(null)).toBeUndefined();
+        expect(omni.readAudioAnalysisFrame(ordinaryAudio)).toBeUndefined();
+        expect(omni.readAudioAnalysisFrame(audio)).toBeNull();
+        latest = frame;
+        expect(omni.readAudioAnalysisFrame(audio)).toBe(frame);
+        latest = null;
+        expect(omni.readAudioAnalysisFrame(audio)).toBeNull();
+    });
+
+    it('refreshes analysis routing when a provider is registered, replaced or removed', () => {
+        const audio = { currentSrc: 'blob:external', src: 'blob:external' } as HTMLAudioElement;
+        expect(omni.readAudioAnalysisFrame(audio)).toBeUndefined();
+        const owner = provider(providerId, undefined);
+        owner.playback!.readAudioAnalysisFrame = () => null;
+        registerOnlineMusicProvider(owner);
+        expect(omni.readAudioAnalysisFrame(audio)).toBeNull();
+        registerOnlineMusicProvider(provider(providerId, undefined));
+        expect(omni.readAudioAnalysisFrame(audio)).toBeUndefined();
+        registerOnlineMusicProvider(owner);
+        expect(omni.readAudioAnalysisFrame(audio)).toBeNull();
+        unregisterOnlineMusicProvider(providerId);
+        expect(omni.readAudioAnalysisFrame(audio)).toBeUndefined();
+    });
+
     it('falls back from a persisted provider missing in the current build', () => {
         useOnlineProviderAccountStore.getState().setActiveProviderId(missingProviderId);
 

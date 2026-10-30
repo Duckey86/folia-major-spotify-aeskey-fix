@@ -9,7 +9,7 @@
 
 Lyrics Reimagined // 辞曲新境
 
-[简体中文](README.md) | [English](README.en.md)
+简体中文 | [English](README.en.md)
 
 [![GitHub release](https://img.shields.io/github/v/release/chthollyphile/folia-major?label=release)](https://github.com/chthollyphile/folia-major/releases)
 [![License](https://img.shields.io/github/license/chthollyphile/folia-major)](https://github.com/chthollyphile/folia-major/blob/main/LICENSE)
@@ -31,28 +31,44 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
-## Folia Soloist — Windows 安装版（无需 npm）
+## Folia Major v0.7.23 + Spotify Soloist
 
-> **本仓库是 Folia 的实验性 Spotify Soloist 分支。** 下方原版 Folia 的 Release 和下载链接 **不包含** 此分支的 Soloist 集成。
+本分支在上游 Folia Major v0.7.23 的基础上集成 Spotify Soloist，安装版版本为 `0.7.23-soloist.1`。Windows 生产安装包已构建并完成人工验证：Spotify 播放、切换下一首、循环模式同步、歌词、原生音频捕获 helper、随节拍响应的可视化和应用重启均正常工作。
 
-如果你已经有**自行构建的** `Folia-Soloist-Setup-0.7.22.exe` 安装包，可以直接使用，无需 Node.js、npm 或 PowerShell：
+下方原版 Folia 的 Release 和下载链接不包含此分支的 Soloist 集成。使用自行构建的 `Folia-Soloist-Setup-0.7.23-soloist.1.exe` 安装包时，无需 Node.js、npm 或 PowerShell：
 
-1. 双击 `Folia-Soloist-Setup-0.7.22.exe`，按照安装向导操作。
+1. 双击 `Folia-Soloist-Setup-0.7.23-soloist.1.exe`，按照安装向导操作。
 2. 从 Windows 开始菜单打开 **Folia Soloist**。
-3. 如果首次启动出现 **Connect Spotify Soloist**，输入**你自己的 Soloist API Key**；应用会使用 Windows 加密保存它。
-4. 在 Folia 中登录 Spotify，然后播放歌曲。安装版会尝试自动启动 Soloist。如有需要，在 Spotify Connect 中选择 **Folia Audio**。
+3. 首次启动会在现有的 Spotify 账户窗口内显示 **Soloist 设置指南**。点击“生成 Soloist API 密钥”，在 Spotify 官方页面用自己的 Premium 账号生成密钥，再粘贴回 Folia。
+4. 按窗口内的提示下载并解压官方 Soloist，选择 `soloist.exe`，点击“保存并启动 Soloist”。密钥通过操作系统加密保存。
+5. 在同一局域网的 Spotify 应用内选择 **Folia Audio**，窗口会自动显示“已连接”。在同一窗口内登录 Spotify 以使用资料库和歌词。以后可从 Spotify 账户窗口或命令面板的 **Spotify Soloist 设置** 更换密钥、重新连接或再次查看指南。
 
 ### Spotify Soloist 设置指南
 
-在使用本分支的 Spotify 播放功能之前，请先阅读并按照 [Spotify Soloist 官方文档](https://developer.spotify.com/documentation/soloist) 下载 Soloist、获取个人 API Key，并完成初始配置。
+首次配置可直接在 Folia 的 Spotify 账户窗口内完成，无需阅读本 README。窗口提供密钥生成、官方下载、程序选择、加密保存、连接状态和设备配对说明；已有密钥和程序会自动识别，无需重复配置。
 
-配置完成后，启动 **Folia Soloist**，并在提示时输入你的 API Key，即可使用 Spotify 播放功能。
+遇到密钥被拒绝、版本过期、启动失败或配对问题时，窗口会显示对应的恢复操作，也可打开 [Spotify Soloist 官方文档](https://developer.spotify.com/documentation/soloist)。
 
 **注意：** 请妥善保管你的 API Key，不要将其公开分享。Spotify Soloist 需要通过 Spotify 官方渠道获取，本仓库不提供其可执行文件。
 
-**安装包说明：** 这些步骤只适用于在构建时**启用了 Soloist 集成并包含用户自行下载的 `soloist.exe`** 的个人安装包。本仓库目前不保证有可公开下载的安装包；请勿将原版 Folia 的安装包与本分支混淆。请勿公开上传个人 API Key；未经相应授权，也不要重新分发包含 Soloist 可执行文件的安装包。
+**安装包说明：** 已验证的安装包在构建渲染进程时启用了 `VITE_FOLIA_SOLOIST=1`，并包含 Folia 自己的原生音频捕获 helper `resources/soloist-capture/folia-soloist-capture.exe`。它不附带 Spotify 的 `soloist.exe`；每位用户需从 Spotify 官方渠道下载，再在应用内选择。已有个人安装中放置的 Soloist 仍可被检测到。此安装包尚未公开发布。
 
-**限制：** 这是对 `node-librespot` `AesKey` 故障的替代播放方案，并未修复其根本原因。Soloist 单独输出音频，因此 Folia 可视化、均衡器和 Automix 不能直接处理这些音频。
+### 随节拍响应的可视化
+
+Soloist 负责输出声音，Folia 的 Windows 原生捕获 helper 将音量和频谱分析数据传给可视化，使其随音乐节拍响应。捕获链路不保存或转发原始音频样本。Folia 负责播放队列和循环模式同步，并保持歌词时间轴与 Soloist 对齐。
+
+Soloist 音频不经过 Folia 的 Web Audio 播放链路，因此均衡器和 Automix 不会处理其实际声音。此集成为 `node-librespot` 的 `AesKey` 播放故障提供替代路径，未修复该故障本身。
+
+### 从源码构建 Windows 安装包
+
+安装依赖和原生构建工具后，在 PowerShell 中运行：
+
+```powershell
+$env:VITE_FOLIA_SOLOIST = '1'
+npm run build:electron -- --win --publish never
+```
+
+构建脚本会编译原生捕获 helper，并生成 `release/Folia-Soloist-Setup-0.7.23-soloist.1.exe`。API 密钥、登录凭据、个人下载的 `soloist.exe`、编译缓存和安装包均不应提交到 Git。
 
 [English installation instructions](README.en.md)
 
