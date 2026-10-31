@@ -29,13 +29,13 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
-## Folia Major v0.7.23 + Spotify Soloist
+## Folia Major v0.7.24 + Spotify Soloist
 
-This branch integrates Spotify Soloist with upstream Folia Major v0.7.23. Its installer version is `0.7.23-soloist.1`. The production Windows installer has been built and manually verified: Spotify playback, next-track transitions, repeat synchronization, lyrics, the native capture helper, beat-reactive visualization, and app restart all work.
+This branch integrates Spotify Soloist with upstream Folia Major v0.7.24. Its installer version is `0.7.24-soloist.1`. It retains the playback, guided setup, next-track transitions, repeat synchronization, lyrics, native capture, and restart support manually verified in v0.7.23-soloist.1, and adds upstream Nebbia, Machi, subtitle row layouts, and the remote-control queue.
 
-The upstream Folia releases and download links elsewhere in this README do not include this integration. With a personally built `Folia-Soloist-Setup-0.7.23-soloist.1.exe` installer, you can use Folia Soloist without Node.js, npm, or PowerShell:
+The upstream Folia releases and download links elsewhere in this README do not include this integration. With a personally built `Folia-Soloist-Setup-0.7.24-soloist.1.exe` installer, you can use Folia Soloist without Node.js, npm, or PowerShell:
 
-1. Double-click `Folia-Soloist-Setup-0.7.23-soloist.1.exe` and complete the Windows installation wizard.
+1. Double-click `Folia-Soloist-Setup-0.7.24-soloist.1.exe` and complete the Windows installation wizard.
 2. Launch **Folia Soloist** from the Windows Start menu.
 3. The Spotify account window shows the **Soloist setup guide** on first launch. Choose **Generate Soloist API key**, generate a personal key on Spotify's official site using your Premium account, and paste it into Folia.
 4. Download and extract the official Soloist build, select `soloist.exe`, and choose **Save and start Soloist**. Folia stores the key using operating-system encryption.
@@ -49,13 +49,15 @@ If a key is rejected, a Soloist build expires, or startup or pairing fails, the 
 
 **Note:** Keep your API key private. Spotify Soloist must be obtained directly from Spotify and is not distributed with this repository.
 
-**Installer contents:** The verified installer was built with `VITE_FOLIA_SOLOIST=1` enabled in the renderer and includes Folia's native capture helper at `resources/soloist-capture/folia-soloist-capture.exe`. It does not include Spotify's `soloist.exe`; each user downloads that from Spotify and selects it in Folia. Existing personal installations can still be detected. This installer has not been publicly released.
+**Installer contents:** Build the installer with `VITE_FOLIA_SOLOIST=1` enabled in the renderer; it includes Folia's native capture helper at `resources/soloist-capture/folia-soloist-capture.exe`. It does not include Spotify's `soloist.exe`; each user downloads that from Spotify and selects it in Folia. Existing personal installations can still be detected. This installer has not been publicly released.
 
 ### Beat-reactive visualization
 
 Soloist outputs the sound while Folia's native Windows capture helper supplies level and spectrum analysis to the visualizer, allowing it to react to the music's beat. The capture path does not save or forward raw audio samples. Folia manages the playback queue and repeat synchronization and keeps its lyric timeline aligned with Soloist.
 
 Soloist audio bypasses Folia's Web Audio playback graph, so the equalizer and Automix do not process its audible output. This integration provides an alternative playback path for the `node-librespot` `AesKey` failure; it does not repair that failure itself.
+
+Nebbia uses the captured vocal frequency band for rain. When stored model analysis is unavailable, live low-band onsets drive Nebbia bumps and Machi neon/ripples; mid/high-band onsets drive Machi screen lights. These are live estimates, not separated vocals, drum stems, or a downbeat grid. They are not saved as analysis results, and are disabled in stored-results-only mode.
 
 ### Build the Windows installer from source
 
@@ -66,7 +68,7 @@ $env:VITE_FOLIA_SOLOIST = '1'
 npm run build:electron -- --win --publish never
 ```
 
-The build script compiles the native capture helper and produces `release/Folia-Soloist-Setup-0.7.23-soloist.1.exe`. Keep API keys, login credentials, personally downloaded `soloist.exe`, build caches, and installers out of Git.
+The build script compiles the native capture helper and produces `release/Folia-Soloist-Setup-0.7.24-soloist.1.exe`. Keep API keys, login credentials, personally downloaded `soloist.exe`, build caches, and installers out of Git.
 
 ## About
 

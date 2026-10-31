@@ -17,6 +17,9 @@ import {
 import { getTransitionHandoffProgress } from '../../../../services/automix/transitionCue';
 import { omni } from '../../../../services/onlineMusic/omni';
 import { tickBeatFx } from '../../../../services/beatFx/beatFxLive';
+import { externalAudioReactivity } from '../../../../services/beatFx/externalAudioReactivity';
+import { smartBeatMayAnalyse } from '../../../../services/beatFx/beatEffects';
+import { useVisualizerSettingsStore } from '../../../../stores/useVisualizerSettingsStore';
 import { useBeatFxTrack } from '../../../../hooks/useBeatFxTrack';
 import { readIncomingLyricClock } from './incomingLyricClock';
 import { isBackgroundLyricHeld, setHeldLyricTime, useBackgroundLyricHoldStore } from '../../backgroundThrottling/backgroundLyricHoldStore';
@@ -247,10 +250,16 @@ export function usePlaybackVisualizerBridge({
         // a visible stutter at exactly the moment meant to be seamless.
         const hasAudibleSignal = isActuallyPlaying || isTransitionAudible();
         const providerFrame = omni.readAudioAnalysisFrame(audioElement);
+        externalAudioReactivity.update(
+            isActuallyPlaying && !backgroundHold && beatFxWantedRef.current
+                && smartBeatMayAnalyse(useVisualizerSettingsStore.getState().smartBeat)
+                ? audioElement?.currentSrc || null : null,
+            audioElement?.currentTime ?? 0, providerFrame, performance.now(),
+        );
 
         if (backgroundHold) {
             // The bands keep their last values: nothing draws from them while held.
-        } else if (providerFrame) {
+        } else if (providerFrame && isActuallyPlaying) {
             // Capture only analysis data from Soloist; no audio playback in Folia.
             audioPower.set(providerFrame.power);
             audioBands.bass.set(providerFrame.bass);
@@ -295,7 +304,7 @@ export function usePlaybackVisualizerBridge({
             audioBands.treble.set(process(treble, 2));
         } else {
             const time = Date.now() / 2000;
-            const breath = (Math.sin(time) + 1) * 20;
+            const breath = providerFrame === undefined ? (Math.sin(time) + 1) * 20 : 0;
             audioPower.set(breath);
             audioBands.bass.set(breath);
             audioBands.lowMid.set(breath);
@@ -379,7 +388,7 @@ export function usePlaybackVisualizerBridge({
         }
 
         if (beatFxWantedRef.current && !backgroundHold) {
-            tickBeatFx(isActuallyPlaying ? audioElement : null, analyserRef.current?.context);
+            tickBeatFx(isActuallyPlaying ? audioElement : null, providerFrame === undefined ? analyserRef.current?.context : null);
         }
 
         // While a blend holds the picture, the active deck is the incoming track: its hand-off, clock
