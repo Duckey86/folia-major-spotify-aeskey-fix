@@ -85,8 +85,8 @@ Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，
 ## 快速下载
 
 > [!TIP]
-> - **GitHub**：[Latest Release](https://github.com/chthollyphile/folia-major/releases/latest)，提供 Windows / macOS / Linux 全平台安装包。
-> - **网盘**：[夸克网盘](https://pan.quark.cn/s/6e4c6fa3bc6f) · [百度云](https://pan.baidu.com/s/1f0x3g-8PMcNCO-TJ5z1rPw?pwd=flia)（提取码 `flia`），适合国内网络，仅提供 Windows 与 Apple silicon 的正式版安装包。
+> - **GitHub**：[Latest Release](https://github.com/Duckey86/folia-major-spotify-aeskey-fix/releases/latest)，提供 Windows 平台安装包。
+> - **网盘**：[百度云](https://pan.baidu.com/s/1yJ9itKIB4PToPtq9-fdb9Q?pwd=duck)（提取码 `duck`），适合国内网络，仅提供 Windows 安装包。
 >
 > 更多获取方式（Web 部署、Docker、AUR、Flatpak、移动端）见下方 [获取方式](#获取方式)。
 
